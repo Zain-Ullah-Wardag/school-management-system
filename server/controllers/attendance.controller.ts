@@ -1,0 +1,15 @@
+import type { Request } from 'express';
+import { AttendanceService } from '../services/attendance.service';
+import { asyncHandler,message,parseId,success } from '../utils/http';
+import type { AuthenticatedRequest } from '../types';
+import { logActivity } from '../utils/activity';
+const service=new AttendanceService();const user=(r:Request)=>(r as AuthenticatedRequest).user!;
+export const roster=asyncHandler((req,res)=>success(res,service.roster(req.query)));
+export const save=asyncHandler((req,res)=>{const result=service.save(req.body,user(req));logActivity(user(req).id,'marked','attendance',undefined,`Marked attendance for ${req.body.attendance_date||'today'}`);success(res,result);});
+export const lock=asyncHandler((req,res)=>{service.lock(parseId(req.params.id),Boolean(req.body.locked));message(res,'Attendance sheet updated');});
+export const daily=asyncHandler((req,res)=>success(res,service.dailyReport(req.query)));
+export const monthly=asyncHandler((req,res)=>success(res,service.monthlySheet(req.query)));
+export const history=asyncHandler((req,res)=>success(res,service.history(parseId(req.params.studentId,'student id'))));
+export const staffList=asyncHandler((req,res)=>success(res,service.listStaff(req.query)));
+export const staffSave=asyncHandler((req,res)=>success(res,service.saveStaff(req.body,user(req))));
+export const markOwn=asyncHandler((req,res)=>success(res,service.markOwnStaffAttendance(user(req),req.body)));

@@ -1,0 +1,5 @@
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
+type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'; loading?: boolean; icon?: ReactNode };
+const variants = { primary: 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm', secondary: 'bg-slate-900 text-white hover:bg-slate-800', outline: 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50', ghost: 'bg-transparent text-slate-600 hover:bg-slate-100', danger: 'bg-rose-600 text-white hover:bg-rose-700' };
+export function Button({ variant = 'primary', loading, icon, className = '', children, disabled, ...props }: Props) { return <button {...props} disabled={disabled || loading} className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${variants[variant]} ${className}`}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}{children}</button>; }

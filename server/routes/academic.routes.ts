@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import * as c from '../controllers/academic.controller';
+import { requireAuth, requirePermission } from '../middleware/auth';
+const router=Router(); router.use(requireAuth);
+router.get('/classes',requirePermission('academic.read'),c.listClasses); router.post('/classes',requirePermission('academic.manage'),c.createClass); router.get('/classes/:id',requirePermission('academic.read'),c.getClass); router.patch('/classes/:id',requirePermission('academic.manage'),c.updateClass); router.delete('/classes/:id',requirePermission('academic.manage'),c.deleteClass);
+router.get('/sections',requirePermission('academic.read'),c.listSections); router.post('/sections',requirePermission('academic.manage'),c.createSection); router.patch('/sections/:id',requirePermission('academic.manage'),c.updateSection); router.delete('/sections/:id',requirePermission('academic.manage'),c.deleteSection);
+router.get('/subjects',requirePermission('academic.read'),c.listSubjects); router.post('/subjects',requirePermission('academic.manage'),c.createSubject); router.patch('/subjects/:id',requirePermission('academic.manage'),c.updateSubject); router.delete('/subjects/:id',requirePermission('academic.manage'),c.deleteSubject);
+router.get('/class-subjects',requirePermission('academic.read'),c.listClassSubjects); router.post('/class-subjects',requirePermission('academic.manage'),c.createClassSubject); router.patch('/class-subjects/:id',requirePermission('academic.manage'),c.updateClassSubject); router.delete('/class-subjects/:id',requirePermission('academic.manage'),c.deleteClassSubject);
+router.get('/sessions',requirePermission('academic.read'),c.listSessions); router.post('/sessions',requirePermission('academic.manage'),c.createSession); router.patch('/sessions/:id',requirePermission('academic.manage'),c.updateSession);
+router.get('/exam-types',requirePermission('academic.read'),c.listExamTypes); router.post('/exam-types',requirePermission('academic.manage'),c.createExamType); router.patch('/exam-types/:id',requirePermission('academic.manage'),c.updateExamType); router.delete('/exam-types/:id',requirePermission('academic.manage'),c.deleteExamType);
+router.get('/rooms',requirePermission('academic.read'),c.listRooms); router.post('/rooms',requirePermission('academic.manage'),c.createRoom); router.patch('/rooms/:id',requirePermission('academic.manage'),c.updateRoom); router.delete('/rooms/:id',requirePermission('academic.manage'),c.deleteRoom);
+export default router;

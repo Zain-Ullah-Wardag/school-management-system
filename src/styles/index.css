@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color: #16231d; background: #f6f8f7; font-synthesis: none; }
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; min-height: 100%; margin: 0; }
+body { overflow: hidden; }
+body { min-width: 320px; background: #f6f8f7; font-family: Inter, "Segoe UI", Tahoma, Arial, sans-serif; }
+#root { overflow: hidden; }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #1aae66; outline-offset: 2px; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c8d5ce; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #a8bcb0; }
+.urdu { font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif; line-height: 2; }
+html.urdu-language body { font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Segoe UI", Tahoma, Arial, sans-serif; }
+.table-shell {  @apply overflow-auto rounded-2xl border border-slate-100 bg-white shadow-panel; }
+.table-shell table { @apply min-w-full text-left text-sm; }
+.table-shell th { @apply whitespace-nowrap border-b border-slate-100 bg-slate-50/70 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500; }
+.table-shell td { @apply border-b border-slate-50 px-4 py-3.5 align-middle text-slate-700; }
+.table-shell tr:last-child td { @apply border-b-0; }
+.form-label { @apply mb-1.5 block text-sm font-medium text-slate-700; }
+.form-control { @apply block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-50; }
+.form-error { @apply mt-1 text-xs font-medium text-rose-600; }
+.print-root { background: white; color: #17211d; font-family: Arial, sans-serif; }
+@media print { body { background: white !important; } .no-print { display: none !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }

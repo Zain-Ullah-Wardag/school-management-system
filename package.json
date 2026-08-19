@@ -1,0 +1,110 @@
+{
+  "name": "school-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline-first Electron school management ERP",
+  "main": "release/electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n SERVER,WEB -c green,cyan \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "cross-env NODE_ENV=development tsx watch server/index.ts",
+    "dev:web": "vite --host 0.0.0.0",
+    "dev:desktop": "concurrently -k -n SERVER,WEB,DESKTOP -c green,cyan,magenta \"npm:dev:server\" \"npm:dev:web\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron -r tsx/cjs electron/main.ts\"",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.server.json && tsc -p tsconfig.electron.json",
+    "build:web": "tsc --noEmit && vite build",
+    "start": "electron .",
+    "start:server": "node release/server/index.js",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "lint": "eslint . --ext ts,tsx --max-warnings 0",
+    "package": "npm run build && electron-builder",
+    "test:smoke": "tsx scripts/smoke-test.ts",
+    "test": "npm run test:smoke",
+    "test:auth": "tsx scripts/auth-user-test.ts",
+    "test:demo": "tsx scripts/demo-seed-test.ts",
+    "start:lan": "cross-env SERVE_RENDERER=true node release/server/index.js",
+    "test:reset": "tsx scripts/reset-test.ts",
+    "test:audit": "tsx scripts/audit-regression-test.ts",
+    "test:sync": "tsx scripts/data-sync-test.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.0",
+    "@tanstack/react-query": "^5.59.0",
+    "axios": "^1.7.7",
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^11.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.468.0",
+    "multer": "^1.4.5-lts.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.1",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.13.3",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8",
+    "serialport": "^12.0.0",
+    "@serialport/parser-readline": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.8.7",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/eslint-plugin": "^8.12.2",
+    "@typescript-eslint/parser": "^8.12.2",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.2",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.14.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "pk.edu.schoolerp",
+    "productName": "School ERP",
+    "directories": {
+      "output": "artifacts"
+    },
+    "files": [
+      "release/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "database",
+        "to": "database",
+        "filter": [
+          "!*.db",
+          "migrations/**/*"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/serialport/**/*",
+      "node_modules/@serialport/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

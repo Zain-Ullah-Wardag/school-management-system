@@ -1,0 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
+import { Modal } from './Modal';
+import { Button } from './Button';
+export function ConfirmDialog({ open, onClose, onConfirm, title = 'Confirm action', description, loading = false, confirmLabel = 'Confirm' }: { open: boolean; onClose: () => void; onConfirm: () => void; title?: string; description: string; loading?: boolean; confirmLabel?: string }) { return <Modal open={open} onClose={onClose} title={title} size="sm"><div className="flex gap-3"><span className="rounded-xl bg-rose-50 p-2 text-rose-600"><AlertTriangle className="h-5 w-5" /></span><p className="pt-1 text-sm leading-6 text-slate-600">{description}</p></div><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="danger" loading={loading} onClick={onConfirm}>{confirmLabel}</Button></div></Modal>; }

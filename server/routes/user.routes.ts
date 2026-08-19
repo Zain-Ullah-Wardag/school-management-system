@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import * as controller from '../controllers/user.controller';
+import { requireAuth, requirePermission } from '../middleware/auth';
+const router = Router();
+router.use(requireAuth, requirePermission('users.manage'));
+router.get('/', controller.listUsers);
+router.post('/', controller.createUser);
+router.get('/roles', controller.roles);
+router.get('/permissions', controller.permissions);
+router.patch('/:id', controller.updateUser);
+router.patch('/:id/reset-password', controller.resetPassword);
+router.delete('/:id', controller.deleteUser);
+export default router;

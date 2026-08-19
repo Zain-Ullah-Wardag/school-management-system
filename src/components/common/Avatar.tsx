@@ -1,0 +1,2 @@
+import { initials } from '../../utils/format';
+export function Avatar({ src, name, className = '' }: { src?: string | null; name?: string | null; className?: string }) { return src ? <img src={src} alt={name || ''} className={`h-9 w-9 rounded-xl object-cover ${className}`} /> : <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-100 text-xs font-bold text-brand-700 ${className}`}>{initials(name)}</span>; }

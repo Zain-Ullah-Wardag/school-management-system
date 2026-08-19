@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import * as c from '../controllers/fee.controller';
+import { configureReminders, reminderStatus, sendReminderNow } from '../controllers/fee-reminder.controller';
+import { requireAuth,requirePermission } from '../middleware/auth';
+const router=Router();router.use(requireAuth);
+router.get('/heads',requirePermission('fees.read'),c.heads);router.post('/heads',requirePermission('fees.manage'),c.saveHead);router.patch('/heads/:id',requirePermission('fees.manage'),c.saveHead);router.delete('/heads/:id',requirePermission('fees.manage'),c.deleteHead);
+router.get('/structures',requirePermission('fees.read'),c.structures);router.post('/structures',requirePermission('fees.manage'),c.saveStructure);router.patch('/structures/:id',requirePermission('fees.manage'),c.saveStructure);router.delete('/structures/:id',requirePermission('fees.manage'),c.deleteStructure);
+router.get('/reminders/status',requirePermission('fees.read','fees.manage'),reminderStatus);router.put('/reminders/config',requirePermission('fees.manage'),configureReminders);router.post('/reminders/send-now',requirePermission('fees.manage','sms.send'),sendReminderNow);
+router.get('/invoices',requirePermission('fees.read'),c.invoices);router.post('/invoices',requirePermission('fees.manage'),c.createInvoice);router.post('/invoices/generate',requirePermission('fees.manage'),c.generateInvoices);router.get('/invoices/:id',requirePermission('fees.read'),c.invoice);router.post('/invoices/:id/void',requirePermission('fees.manage'),c.voidInvoice);
+router.post('/payments',requirePermission('fees.collect','fees.manage'),c.payment);router.get('/payments/:id/receipt',requirePermission('fees.read','fees.collect'),c.receipt);router.get('/reports',requirePermission('fees.read','reports.read'),c.reports);
+router.get('/income',requirePermission('finance.manage','reports.read'),c.income);router.post('/income',requirePermission('finance.manage'),c.saveIncome);router.patch('/income/:id',requirePermission('finance.manage'),c.saveIncome);router.delete('/income/:id',requirePermission('finance.manage'),c.deleteIncome);
+router.get('/expenses',requirePermission('finance.manage','reports.read'),c.expenses);router.post('/expenses',requirePermission('finance.manage'),c.saveExpense);router.patch('/expenses/:id',requirePermission('finance.manage'),c.saveExpense);router.delete('/expenses/:id',requirePermission('finance.manage'),c.deleteExpense);router.get('/expense-categories',requirePermission('finance.manage'),c.categories);router.post('/expense-categories',requirePermission('finance.manage'),c.saveCategory);router.get('/finance-summary',requirePermission('finance.manage','reports.read'),c.financeSummary);
+export default router;

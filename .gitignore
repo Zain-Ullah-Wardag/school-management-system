@@ -1,0 +1,13 @@
+node_modules/
+release/
+artifacts/
+.env
+*.db
+*.db-wal
+*.db-shm
+uploads/*
+!uploads/.gitkeep
+backups/*
+!backups/.gitkeep
+
+tmp/

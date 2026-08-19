@@ -1,0 +1,18 @@
+import { Router } from 'express';
+import * as controller from '../controllers/staff.controller';
+import { requireAuth, requirePermission } from '../middleware/auth';
+const router = Router();
+router.use(requireAuth);
+router.get('/options', requirePermission('staff.read','academic.read'), controller.staffOptions);
+router.get('/me/workspace', controller.myWorkspace);
+router.get('/departments', requirePermission('staff.read'), controller.departments);
+router.post('/departments', requirePermission('staff.manage'), controller.addDepartment);
+router.get('/designations', requirePermission('staff.read'), controller.designations);
+router.post('/designations', requirePermission('staff.manage'), controller.addDesignation);
+router.get('/', requirePermission('staff.read'), controller.listStaff);
+router.post('/', requirePermission('staff.manage'), controller.createStaff);
+router.get('/:id', requirePermission('staff.read'), controller.getStaff);
+router.patch('/:id', requirePermission('staff.manage'), controller.updateStaff);
+router.delete('/:id', requirePermission('staff.manage'), controller.archiveStaff);
+router.post('/:id/salary-history', requirePermission('staff.manage'), controller.addSalary);
+export default router;

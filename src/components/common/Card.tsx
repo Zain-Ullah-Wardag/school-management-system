@@ -1,0 +1,3 @@
+import type { HTMLAttributes, ReactNode } from 'react';
+export function Card({ children, className = '', ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) { return <section {...props} className={`rounded-2xl border border-slate-100 bg-white shadow-panel ${className}`}>{children}</section>; }
+export function CardHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) { return <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4"><div><h2 className="text-base font-bold text-slate-800">{title}</h2>{description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}</div>{action}</div>; }

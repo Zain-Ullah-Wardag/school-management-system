@@ -1,0 +1,12 @@
+import { asyncHandler, message, parseId, success } from '../utils/http';
+import { TimetableService } from '../services/timetable.service';
+const service=new TimetableService();
+export const getSettings=asyncHandler((_req,res)=>success(res,service.settings()));
+export const updateSettings=asyncHandler((req,res)=>success(res,service.saveSettings(req.body)));
+export const createPeriod=asyncHandler((req,res)=>success(res,service.savePeriod(req.body),201));
+export const updatePeriod=asyncHandler((req,res)=>success(res,service.savePeriod(req.body,parseId(req.params.id))));
+export const deletePeriod=asyncHandler((req,res)=>{service.deletePeriod(parseId(req.params.id));message(res,'Period deleted');});
+export const listEntries=asyncHandler((req,res)=>success(res,service.entries(req.query)));
+export const createEntry=asyncHandler((req,res)=>success(res,service.saveEntry(req.body),201));
+export const updateEntry=asyncHandler((req,res)=>success(res,service.saveEntry(req.body,parseId(req.params.id))));
+export const deleteEntry=asyncHandler((req,res)=>{service.deleteEntry(parseId(req.params.id));message(res,'Timetable entry deleted');});

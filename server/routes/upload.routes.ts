@@ -1,0 +1,7 @@
+import { Router } from 'express';
+import { requireAuth } from '../middleware/auth';
+import { upload } from '../middleware/upload';
+import { uploadFile } from '../controllers/upload.controller';
+const router = Router();
+router.post('/', requireAuth, upload.single('file'), uploadFile);
+export default router;
