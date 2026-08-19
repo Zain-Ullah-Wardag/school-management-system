@@ -13,15 +13,13 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { Field, SelectInput, TextArea, TextInput } from '../common/FormFields';
 import { Tabs } from '../common/Tabs';
 import { money, todayInput } from '../../utils/format';
+import { financeActionLabel, financeSectionLabel, type FinanceKind } from '../../utils/finance';
 
-type Kind = 'income' | 'expense';
+type Kind = FinanceKind;
 type EditorState = { kind: Kind; item: any };
 type DeleteState = { kind: Kind; item: any };
 
-const labels: Record<Kind, string> = {
-  income: 'Income',
-  expense: 'Expense'
-};
+const labels = financeSectionLabel;
 
 export function FinancePanel() {
   const [kind, setKind] = useState<Kind>('income');
@@ -92,7 +90,7 @@ export function FinancePanel() {
         onChange={changeKind}
       />
       <Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditor({ kind, item: {} })}>
-        Add {activeLabel}
+        {financeActionLabel(kind)}
       </Button>
     </div>
 

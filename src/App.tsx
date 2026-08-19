@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { RequirePermission } from './components/common/RequirePermission';
 import { LoadingScreen } from './components/common/LoadingScreen';
@@ -22,7 +22,7 @@ const Settings = lazy(() => import('./pages/settings/SettingsPage'));
 const NotFound = lazy(() => import('./pages/NotFoundPage'));
 
 export default function App() {
-  return <BrowserRouter><Suspense fallback={<LoadingScreen />}><Routes>
+  return <HashRouter><Suspense fallback={<LoadingScreen />}><Routes>
     <Route path="/login" element={<Login />} />
     <Route element={<ProtectedRoute />}>
       <Route element={<AppShell />}>
@@ -42,5 +42,5 @@ export default function App() {
       </Route>
     </Route>
     <Route path="*" element={<NotFound />} />
-  </Routes></Suspense></BrowserRouter>;
+  </Routes></Suspense></HashRouter>;
 }

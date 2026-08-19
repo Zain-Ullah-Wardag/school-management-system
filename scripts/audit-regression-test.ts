@@ -104,7 +104,7 @@ async function run() {
     await api('POST', '/attendance', { attendance_date: '2026-08-11', class_id: schoolClass.id, section_id: section.id, records: [{ student_id: student.id, status: 'leave' }] });
     await api('POST', '/attendance', { attendance_date: '2026-08-12', class_id: schoolClass.id, section_id: section.id, records: [{ student_id: student.id, status: 'late' }] });
     history = await api<any>('GET', `/attendance/students/${student.id}/history`);
-    assert(history.marked_days === 3 && history.present_days === 0 && history.absent_days === 1 && history.leave_days === 1 && history.late_days === 1 && history.attended_days === 1 && history.percentage === 33.3 && history.current_status === 'late', 'Attendance history and summary no longer match');
+    assert(history.marked_days === 3 && history.present_days === 0 && history.absent_days === 1 && history.leave_days === 1 && history.late_days === 1 && history.attended_days === 1 && history.percentage === 33.3 && history.last_status === 'late' && history.current_status === 'late', 'Attendance history and summary no longer match');
 
     // Class-test marks: equal-to-total and decimal are valid; over-total and negative are rejected by the API.
     const classTest = await api<{ id: number }>('POST', '/assessments/tests', { name: 'Audit Class Test', test_date: testDate, class_id: schoolClass.id, section_id: section.id, subject_id: subject.id, total_marks: 20, passing_marks: 8 });
@@ -146,9 +146,13 @@ async function run() {
     // A type-selected certificate returns a type-selected payload; ID Card can no longer fall back to Bonafide.
     const bonafide = await api<any>('GET', `/reports/certificate/${student.id}?type=bonafide`);
     const enrollment = await api<any>('GET', `/reports/certificate/${student.id}?type=enrollment`);
+    const character = await api<any>('GET', `/reports/certificate/${student.id}?type=character`);
+    const leaving = await api<any>('GET', `/reports/certificate/${student.id}?type=leaving`);
     const idCard = await api<any>('GET', `/reports/certificate/${student.id}?type=id-card`);
     assert(bonafide.type === 'bonafide' && bonafide.certificate_title === 'BONAFIDE CERTIFICATE' && bonafide.certificate_number.startsWith('BON-'), 'Bonafide certificate payload is incorrect');
     assert(enrollment.type === 'enrollment' && enrollment.certificate_title === 'ENROLLMENT CERTIFICATE' && enrollment.certificate_number.startsWith('ENR-') && enrollment.template_body !== bonafide.template_body, 'Enrollment certificate payload is incorrect');
+    assert(character.type === 'character' && character.certificate_title === 'CHARACTER CERTIFICATE' && character.certificate_number.startsWith('CHR-') && character.certificate_body.includes('Audit Student'), 'Character certificate payload is incorrect');
+    assert(leaving.type === 'leaving' && leaving.certificate_title === 'LEAVING CERTIFICATE' && leaving.certificate_number.startsWith('LVC-') && leaving.certificate_body.includes('leaving'), 'Leaving certificate payload is incorrect');
     assert(idCard.type === 'id-card' && idCard.certificate_title === 'STUDENT ID CARD' && idCard.certificate_number.startsWith('ID-') && !idCard.template_body, 'ID Card payload fell back to a certificate template');
     const unsupported = await request('GET', `/reports/certificate/${student.id}?type=unknown`);
     assert(unsupported.status === 422, 'Unsupported certificate type was accepted');

@@ -1,6 +1,14 @@
 import { escapeHtml } from './print';
 
-export type CertificateDocumentType = 'bonafide' | 'enrollment' | 'id-card';
+export type CertificateDocumentType = 'bonafide' | 'enrollment' | 'character' | 'leaving' | 'id-card';
+
+export const certificateCatalog: { type: CertificateDocumentType; label: string; printable: boolean }[] = [
+  { type: 'bonafide', label: 'Bonafide Certificate', printable: true },
+  { type: 'enrollment', label: 'Enrollment Certificate', printable: true },
+  { type: 'character', label: 'Character Certificate', printable: true },
+  { type: 'leaving', label: 'Leaving Certificate', printable: true },
+  { type: 'id-card', label: 'Student ID Card', printable: true }
+];
 export type CertificateLayout = 'portrait' | 'landscape';
 
 export type CertificateData = {
@@ -28,6 +36,8 @@ export type CertificateData = {
 
 export const certificateTitle = (type: string) => {
   if (type === 'enrollment') return 'ENROLLMENT CERTIFICATE';
+  if (type === 'character') return 'CHARACTER CERTIFICATE';
+  if (type === 'leaving') return 'LEAVING CERTIFICATE';
   if (type === 'id-card') return 'STUDENT ID CARD';
   return 'BONAFIDE CERTIFICATE';
 };

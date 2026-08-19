@@ -14,5 +14,5 @@ export default defineConfig({
       '/uploads': { target: 'http://127.0.0.1:3299', changeOrigin: true }
     }
   },
-  build: { outDir: 'release/renderer', emptyOutDir: false }
+  build: { outDir: 'release/renderer', emptyOutDir: true }
 });

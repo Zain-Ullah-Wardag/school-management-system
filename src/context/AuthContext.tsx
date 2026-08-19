@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { schoolApi } from '../services/schoolApi';
+import { queryKeys } from '../services/queryKeys';
 import type { User } from '../types';
 
 type AuthContextValue = {
@@ -58,7 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearProtectedData();
     setUser(result.user);
     setLoading(false);
-  }, [clearProtectedData]);
+    if (result.user?.id) {
+      try {
+        await queryClient.prefetchQuery({
+          queryKey: queryKeys.dashboard.overview(result.user.id),
+          queryFn: schoolApi.dashboard
+        });
+      } catch {
+        // Login must still succeed; the dashboard will retry on mount.
+      }
+    }
+  }, [clearProtectedData, queryClient]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(tokenKey);

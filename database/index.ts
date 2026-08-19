@@ -9,6 +9,7 @@ import * as migration005 from './migrations/005_visitors';
 import * as migration006 from './migrations/006_messaging_providers';
 import * as migration007 from './migrations/007_marks_validation';
 import * as migration008 from './migrations/008_certificate_template_defaults';
+import * as migration009 from './migrations/009_additional_certificate_types';
 import { seedDatabase } from './seed';
 
 const migrations = [
@@ -19,7 +20,8 @@ const migrations = [
   ['005_visitors', migration005.up],
   ['006_messaging_providers', migration006.up],
   ['007_marks_validation', migration007.up],
-  ['008_certificate_template_defaults', migration008.up]
+  ['008_certificate_template_defaults', migration008.up],
+  ['009_additional_certificate_types', migration009.up]
 ] as const;
 
 let instance: Database.Database | null = null;

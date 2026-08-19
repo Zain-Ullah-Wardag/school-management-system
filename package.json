@@ -24,7 +24,8 @@
     "start:lan": "cross-env SERVE_RENDERER=true node release/server/index.js",
     "test:reset": "tsx scripts/reset-test.ts",
     "test:audit": "tsx scripts/audit-regression-test.ts",
-    "test:sync": "tsx scripts/data-sync-test.ts"
+    "test:sync": "tsx scripts/data-sync-test.ts",
+    "test:production": "tsx scripts/production-startup-test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

@@ -3,7 +3,7 @@ import { ApiError } from '../utils/errors';
 import { today } from '../utils/serializers';
 import { SettingsService } from './settings.service';
 
-export const certificateTypes = ['bonafide', 'enrollment', 'id-card'] as const;
+export const certificateTypes = ['bonafide', 'enrollment', 'character', 'leaving', 'id-card'] as const;
 export type CertificateType = typeof certificateTypes[number];
 
 type CertificateDefinition = {
@@ -26,6 +26,18 @@ const definitions: Record<CertificateType, CertificateDefinition> = {
     templateKey: 'certificate.enrollment_template',
     fallbackTemplate: 'This is to certify that {{student_name}}, son/daughter of {{father_name}}, bearing Registration No. {{registration_number}} and Roll No. {{roll_number}}, is duly enrolled at {{school_name}} in Class {{class}}, Section {{section}}, for the Academic Session {{session}}. This confirms the student\'s current active enrollment in the institution. The certificate is issued on {{issue_date}} at the request of the student or parent/guardian for official use.'
   },
+  character: {
+    title: 'CHARACTER CERTIFICATE',
+    numberPrefix: 'CHR',
+    templateKey: 'certificate.character_template',
+    fallbackTemplate: 'This is to certify that {{student_name}}, son/daughter of {{father_name}}, bearing Registration No. {{registration_number}} and Roll No. {{roll_number}}, is a student of {{school_name}} in Class {{class}}, Section {{section}}, for the Academic Session {{session}}. During the period of association with this institution, the student\'s character, conduct, and behaviour have been found to be good and satisfactory. This character certificate is issued on {{issue_date}} for official purposes.'
+  },
+  leaving: {
+    title: 'LEAVING CERTIFICATE',
+    numberPrefix: 'LVC',
+    templateKey: 'certificate.leaving_template',
+    fallbackTemplate: 'This is to certify that {{student_name}}, son/daughter of {{father_name}}, bearing Registration No. {{registration_number}} and Roll No. {{roll_number}}, was enrolled at {{school_name}} in Class {{class}}, Section {{section}}, for the Academic Session {{session}}. The student is leaving the institution with effect from {{issue_date}}. According to the records maintained by the school, the student\'s conduct has been satisfactory. This leaving certificate is issued at the request of the parent or guardian.'
+  },
   'id-card': {
     title: 'STUDENT ID CARD',
     numberPrefix: 'ID'
@@ -34,7 +46,7 @@ const definitions: Record<CertificateType, CertificateDefinition> = {
 
 function normalizeType(value: string): CertificateType {
   if ((certificateTypes as readonly string[]).includes(value)) return value as CertificateType;
-  throw new ApiError(422, 'Unsupported certificate type. Select Bonafide, Enrollment, or Student ID Card.');
+  throw new ApiError(422, 'Unsupported certificate type. Select Bonafide, Enrollment, Character, Leaving, or Student ID Card.');
 }
 
 function renderTemplate(template: string, values: Record<string, string>) {

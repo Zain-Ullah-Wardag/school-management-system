@@ -9,7 +9,7 @@ import { Card } from '../../components/common/Card';
 import { Field, SelectInput, TextInput } from '../../components/common/FormFields';
 import { exportExcel } from '../../utils/export';
 import { escapeHtml, printHtml } from '../../utils/print';
-import { buildCertificate } from '../../utils/certificate';
+import { buildCertificate, certificateCatalog } from '../../utils/certificate';
 import { currentMonthInput, fullName, todayInput } from '../../utils/format';
 import { useToast } from '../../context/ToastContext';
 import { useGlobalSearch } from '../../context/GlobalSearchContext';
@@ -23,7 +23,7 @@ const options: { id: ReportKind; title: string; description: string; icon: typeo
   { id: 'finance', title: 'Income & expenses', description: 'Financial activity and net income', icon: TableProperties },
   { id: 'award', title: 'Award list', description: 'Exam positions and result performance', icon: Award },
   { id: 'timetable', title: 'Timetable', description: 'Class weekly timetable', icon: CalendarDays },
-  { id: 'certificate', title: 'Certificates', description: 'Bonafide, enrollment, and ID cards', icon: FileText }
+  { id: 'certificate', title: 'Certificates', description: 'Bonafide, enrollment, character, leaving, and ID cards', icon: FileText }
 ];
 
 export default function ReportsPage() {
@@ -79,7 +79,7 @@ export default function ReportsPage() {
       {kind === 'attendance' && <><Field label="Attendance report"><SelectInput value={filters.attendance_mode} onChange={(event) => setFilter({ attendance_mode: event.target.value, student_id: '' })}><option value="daily">Daily class summary</option><option value="monthly">Student monthly sheet</option><option value="history">Student attendance history</option></SelectInput></Field>{filters.attendance_mode === 'daily' ? <Field label="Attendance date"><TextInput type="date" value={filters.date} onChange={(event) => setFilter({ date: event.target.value })} /></Field> : <><Field label="Student"><StudentSelect value={filters.student_id} students={studentsPage?.data || []} onChange={(value) => setFilter({ student_id: value })} /></Field>{filters.attendance_mode === 'monthly' && <Field label="Month"><TextInput type="month" value={filters.month} onChange={(event) => setFilter({ month: event.target.value })} /></Field>}</>}</>}
       {(kind === 'fees' || kind === 'finance') && <><Field label="From"><TextInput type="date" value={filters.from} onChange={(event) => setFilter({ from: event.target.value })} /></Field><Field label="To"><TextInput type="date" value={filters.to} onChange={(event) => setFilter({ to: event.target.value })} /></Field></>}
       {kind === 'award' && <Field label="Exam"><SelectInput value={filters.exam_id || ''} onChange={(event) => setFilter({ exam_id: event.target.value })}><option value="">Select exam</option>{exams.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput></Field>}
-      {kind === 'certificate' && <><Field label="Student"><StudentSelect value={filters.student_id} students={studentsPage?.data || []} onChange={(value) => setFilter({ student_id: value })} /></Field><Field label="Certificate / document"><SelectInput value={filters.type} onChange={(event) => setFilter({ type: event.target.value })}><option value="bonafide">Bonafide Certificate</option><option value="enrollment">Enrollment Certificate</option><option value="id-card">Student ID Card</option></SelectInput></Field></>}
+      {kind === 'certificate' && <><Field label="Student"><StudentSelect value={filters.student_id} students={studentsPage?.data || []} onChange={(value) => setFilter({ student_id: value })} /></Field><Field label="Certificate / document"><SelectInput value={filters.type} onChange={(event) => setFilter({ type: event.target.value })}>{certificateCatalog.map((item) => <option key={item.type} value={item.type}>{item.label}</option>)}</SelectInput></Field></>}
       <div className="flex items-end gap-2"><Button loading={loading} onClick={() => void run()}>Run report</Button>{result && <Button variant="outline" icon={<Printer className="h-4 w-4" />} onClick={print}>Print / PDF</Button>}{result && kind !== 'certificate' && <Button variant="outline" icon={<Download className="h-4 w-4" />} onClick={() => exportExcel(exportRows, `${kind}-report`)}>Excel</Button>}</div>
     </div></Card>
     {result && <ReportPreview kind={kind} data={result} search={globalQuery} />}
