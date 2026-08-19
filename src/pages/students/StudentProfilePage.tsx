@@ -109,7 +109,7 @@ export default function StudentProfilePage() {
           <Metric label="Emergency contact" value={student.emergency_contact || student.phone || 'Not entered'} detail="For urgent school communication" />
         </div>
         <Card>
-          <CardHeader title="Attendance history" description="The summary is calculated from the same saved rows shown below and refreshes as soon as attendance is saved." action={isAttendanceLoading ? <span className="text-xs text-slate-400">Loading…</span> : <Badge value={attendance?.current_status || 'not_marked'} />} />
+          <CardHeader title="Attendance history" description="The summary is calculated from the same saved rows shown below and refreshes as soon as attendance is saved." action={isAttendanceLoading ? <span className="text-xs text-slate-400">Loading…</span> : <Badge value={attendance?.today_status && attendance.today_status !== 'not_marked' ? attendance.today_status : (attendance?.current_status || 'not_marked')} />} />
           <div className="grid grid-cols-2 divide-x divide-y divide-slate-100 border-b border-slate-100 md:grid-cols-4 md:divide-y-0">
             <AttendanceCount label="Present days" value={attendance?.present_days ?? 0} tone="brand" />
             <AttendanceCount label="Absent days" value={attendance?.absent_days ?? 0} tone="rose" />
