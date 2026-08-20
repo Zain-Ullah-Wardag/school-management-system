@@ -16,12 +16,10 @@ import { useGlobalSearch } from '../../context/GlobalSearchContext';
 import { apiError } from '../../services/api';
 import { queryKeys } from '../../services/queryKeys';
 import { useDataSync } from '../../hooks/useDataSync';
+import { academicActionLabel, academicEditorTitle, academicTabConfig, academicTabs, type AcademicTab } from '../../utils/academic';
 
-type Tab = 'classes' | 'sections' | 'subjects' | 'assignments' | 'sessions' | 'rooms';
+type Tab = AcademicTab;
 type Editor = { tab: Tab; item?: any } | null;
-
-const labels: Record<Tab, string> = { classes: 'Classes', sections: 'Sections', subjects: 'Subjects', assignments: 'Subject allocation', sessions: 'Academic sessions', rooms: 'Rooms' };
-const singularLabels: Record<Tab, string> = { classes: 'Class', sections: 'Section', subjects: 'Subject', assignments: 'Subject allocation', sessions: 'Session', rooms: 'Room' };
 
 export default function AcademicPage() {
   const [tab, setTab] = useState<Tab>('classes');
@@ -43,8 +41,16 @@ export default function AcademicPage() {
   const { data: staff = [] } = useQuery({ queryKey: queryKeys.staff.options, queryFn: schoolApi.staff.options });
 
   const datasets: Record<Tab, any[]> = { classes, sections, subjects, assignments, sessions, rooms };
-  const loading = classesLoading || sectionsLoading || subjectsLoading || assignmentsLoading || sessionsLoading || roomsLoading;
+  const loadingByTab: Record<Tab, boolean> = {
+    classes: classesLoading,
+    sections: sectionsLoading,
+    subjects: subjectsLoading,
+    assignments: assignmentsLoading,
+    sessions: sessionsLoading,
+    rooms: roomsLoading
+  };
   const refresh = () => synchronize(['academic']);
+  const activeTab = academicTabConfig(tab);
   const filteredRows = useMemo(() => datasets[tab].filter((row) => {
     const text = Object.values(row).join(' ').toLowerCase();
     const activeSearch = globalQuery.trim() || search.trim();
@@ -65,7 +71,7 @@ export default function AcademicPage() {
       if (target.tab === 'rooms') await schoolApi.academic.saveRoom(values, target.item?.id);
       await refresh();
       setEditor(null);
-      toast('success', `${labels[target.tab]} saved`);
+      toast('success', `${academicTabConfig(target.tab).label} saved`);
     } catch (error) { toast('error', 'Could not save record', apiError(error)); }
   };
 
@@ -79,21 +85,21 @@ export default function AcademicPage() {
       if (removing.tab === 'rooms') await schoolApi.academic.deleteRoom(removing.item.id);
       await refresh();
       setRemoving(null);
-      toast('success', `${labels[removing.tab]} deleted`);
+      toast('success', `${academicTabConfig(removing.tab).label} deleted`);
     } catch (error) { toast('error', 'Record could not be deleted', apiError(error)); }
   };
 
   return <>
-    <PageHeader title="Academic setup" description="Build the school's classes, sections, subjects, staff allocations and academic calendar." actions={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditor({ tab })}>Add {singularLabels[tab]}</Button>} />
-    <Tabs tabs={(Object.keys(labels) as Tab[]).map((id) => ({ id, label: labels[id], count: datasets[id].length }))} value={tab} onChange={(next) => { setTab(next); setSearch(''); setClassFilter(''); setStatusFilter(''); }} />
+    <PageHeader title="Academic setup" description="Build the school's classes, sections, subjects, staff allocations and academic calendar." actions={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditor({ tab })}>{academicActionLabel(tab)}</Button>} />
+    <Tabs tabs={academicTabs.map((item) => ({ id: item.id, label: item.label, count: datasets[item.id].length }))} value={tab} onChange={(next) => { setTab(next); setSearch(''); setClassFilter(''); setStatusFilter(''); }} />
     <div className="mb-4 grid gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-panel lg:grid-cols-[1fr_220px_180px]">
-      <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><TextInput className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${labels[tab].toLowerCase()}…`} /></div>
+      <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><TextInput className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${activeTab.label.toLowerCase()}…`} /></div>
       {(tab === 'sections' || tab === 'assignments') ? <SelectInput value={classFilter} onChange={(event) => setClassFilter(event.target.value)}><option value="">All classes</option>{classes.map((schoolClass: any) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</SelectInput> : <span />}
       {['classes', 'sections', 'subjects', 'rooms', 'sessions'].includes(tab) ? <SelectInput value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>{tab === 'sessions' && <><option value="planned">Planned</option><option value="closed">Closed</option></>}</SelectInput> : <span />}
     </div>
-    <DataTable loading={loading} columns={columnsFor(tab, (item) => setEditor({ tab, item }), (item) => setRemoving({ tab, item }))} rows={filteredRows} emptyText={`No ${labels[tab].toLowerCase()} match these filters.`} />
-    <Modal open={Boolean(editor)} onClose={() => setEditor(null)} title={`${editor?.item ? 'Edit' : 'Add'} ${editor ? singularLabels[editor.tab] : ''}`} size="md">{editor && <AcademicEditor tab={editor.tab} item={editor.item} classes={classes} sections={sections} subjects={subjects} staff={staff} onClose={() => setEditor(null)} onSaved={(values) => void save(values, editor)} />}</Modal>
-    <ConfirmDialog open={Boolean(removing)} onClose={() => setRemoving(null)} onConfirm={() => void remove()} title="Delete academic record" confirmLabel="Delete" description={`Delete this ${removing ? singularLabels[removing.tab] : 'record'}? Records with operational history are protected.`} />
+    <DataTable loading={loadingByTab[tab]} columns={columnsFor(tab, (item) => setEditor({ tab, item }), (item) => setRemoving({ tab, item }))} rows={filteredRows} emptyText={`No ${activeTab.label.toLowerCase()} match these filters.`} />
+    <Modal open={Boolean(editor)} onClose={() => setEditor(null)} title={editor ? academicEditorTitle(editor.tab, Boolean(editor.item)) : ''} size="md">{editor && <AcademicEditor tab={editor.tab} item={editor.item} classes={classes} sections={sections} subjects={subjects} staff={staff} onClose={() => setEditor(null)} onSaved={(values) => void save(values, editor)} />}</Modal>
+    <ConfirmDialog open={Boolean(removing)} onClose={() => setRemoving(null)} onConfirm={() => void remove()} title="Delete academic record" confirmLabel="Delete" description={`Delete this ${removing ? academicTabConfig(removing.tab).singular.toLowerCase() : 'record'}? Records with operational history are protected.`} />
   </>;
 }
 

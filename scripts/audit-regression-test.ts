@@ -3,6 +3,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { obtainedMarksError } from '../src/utils/marks';
+import { buildCertificate } from '../src/utils/certificate';
+import { academicActionLabel } from '../src/utils/academic';
+import { financeActionLabel } from '../src/utils/finance';
 
 const root = process.cwd();
 const port = 3404;
@@ -105,6 +108,7 @@ async function run() {
     await api('POST', '/attendance', { attendance_date: '2026-08-12', class_id: schoolClass.id, section_id: section.id, records: [{ student_id: student.id, status: 'late' }] });
     history = await api<any>('GET', `/attendance/students/${student.id}/history`);
     assert(history.marked_days === 3 && history.present_days === 0 && history.absent_days === 1 && history.leave_days === 1 && history.late_days === 1 && history.attended_days === 1 && history.percentage === 33.3 && history.last_status === 'late' && history.current_status === 'late', 'Attendance history and summary no longer match');
+    assert(Array.isArray(history.records) && history.records.length === 3 && typeof history.percentage === 'number' && history.today_status !== undefined, 'Attendance history payload is missing the summary used by profile statistic cards');
 
     // Class-test marks: equal-to-total and decimal are valid; over-total and negative are rejected by the API.
     const classTest = await api<{ id: number }>('POST', '/assessments/tests', { name: 'Audit Class Test', test_date: testDate, class_id: schoolClass.id, section_id: section.id, subject_id: subject.id, total_marks: 20, passing_marks: 8 });
@@ -156,6 +160,36 @@ async function run() {
     assert(idCard.type === 'id-card' && idCard.certificate_title === 'STUDENT ID CARD' && idCard.certificate_number.startsWith('ID-') && !idCard.template_body, 'ID Card payload fell back to a certificate template');
     const unsupported = await request('GET', `/reports/certificate/${student.id}?type=unknown`);
     assert(unsupported.status === 422, 'Unsupported certificate type was accepted');
+    for (const payload of [bonafide, enrollment, character, leaving]) {
+      const html = buildCertificate(payload, 'landscape');
+      assert(!html.includes('Father / Guardian') && !html.includes('Class / Section'), `${payload.type} certificate still includes the student information table`);
+      assert(html.includes('Audit Student'), `${payload.type} certificate dropped the student name from the body`);
+    }
+
+    assert(academicActionLabel('sessions') === 'Add Academic Session' && academicActionLabel('assignments') === 'Add Allocation', 'Academic setup action labels are incorrect');
+    assert(financeActionLabel('income') === 'Add Income' && financeActionLabel('expense') === 'Add Expense', 'Finance action labels are incorrect');
+
+    const beforeTimes = await api<{ periods: { id: number; name: string; start_time: string; end_time: string; period_type: string; sequence: number }[]; school_days: any[]; settings: { default_period_minutes: number } }>('GET', '/timetable/settings');
+    const lessonIds = beforeTimes.periods.filter((period) => period.period_type === 'lesson').map((period) => period.id);
+    const breakBefore = beforeTimes.periods.find((period) => period.period_type === 'break');
+    const updatedTimes = await api<{ periods: { id: number; start_time: string; end_time: string; period_type: string }[]; settings: { default_period_minutes: number } }>('PATCH', '/timetable/settings', {
+      default_period_minutes: 45,
+      school_days: [1, 2, 3, 4, 5],
+      days: beforeTimes.school_days
+    });
+    assert(updatedTimes.settings.default_period_minutes === 45, 'Default lesson duration was not persisted');
+    const period1 = updatedTimes.periods.find((period) => period.period_type === 'lesson');
+    assert(period1?.start_time === '08:00' && period1?.end_time === '08:45', 'First lesson period was not recalculated to 45 minutes');
+    const breakAfter = updatedTimes.periods.find((period) => period.period_type === 'break');
+    if (breakBefore && breakAfter) {
+      const breakLength = (start: string, end: string) => {
+        const [sh, sm] = start.split(':').map(Number);
+        const [eh, em] = end.split(':').map(Number);
+        return (eh * 60 + em) - (sh * 60 + sm);
+      };
+      assert(breakLength(breakAfter.start_time, breakAfter.end_time) === breakLength(breakBefore.start_time, breakBefore.end_time), 'Break duration was not preserved');
+    }
+    assert(lessonIds.every((id) => updatedTimes.periods.some((period) => period.id === id)), 'Lesson period records were replaced instead of updated in place');
 
     // Validate the database trigger itself, independent of HTTP validation.
     const direct = new Database(databasePath);

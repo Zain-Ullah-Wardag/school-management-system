@@ -13,7 +13,8 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { Field, SelectInput, TextArea, TextInput } from '../common/FormFields';
 import { Tabs } from '../common/Tabs';
 import { money, todayInput } from '../../utils/format';
-import { financeActionLabel, financeSectionLabel, type FinanceKind } from '../../utils/finance';
+import { financeActionLabel, financeModalTitle, financeSectionLabel, type FinanceKind } from '../../utils/finance';
+import { isFailedLoad, isInitialLoad } from '../../utils/queryDisplay';
 
 type Kind = FinanceKind;
 type EditorState = { kind: Kind; item: any };
@@ -29,7 +30,7 @@ export function FinancePanel() {
 
   // Load exactly the active ledger. Each tab is backed by its own API endpoint,
   // so income rows can never be rendered in the expense history (or vice versa).
-  const { data: entries, isLoading } = useQuery({
+  const { data: entries, isPending: entriesPending } = useQuery({
     queryKey: queryKeys.finance.entries(kind, page),
     queryFn: () => kind === 'income'
       ? schoolApi.fees.income({ page, limit: 25 })
@@ -39,10 +40,13 @@ export function FinancePanel() {
     queryKey: queryKeys.finance.categories,
     queryFn: schoolApi.fees.categories
   });
-  const { data: summary, isLoading: isSummaryLoading } = useQuery({
+  const { data: summary, isPending: summaryPending, isError: summaryError, refetch: refetchSummary } = useQuery({
     queryKey: queryKeys.finance.summary,
     queryFn: schoolApi.fees.financeSummary
   });
+  const summaryLoading = isInitialLoad(summaryPending, summary);
+  const summaryFailed = isFailedLoad(summaryError, summary);
+  const entriesLoading = isInitialLoad(entriesPending, entries);
 
   const save = useMutationToast(
     ({ body, id, entryKind }: { body: object; id?: number; entryKind: Kind }) => entryKind === 'income'
@@ -77,11 +81,12 @@ export function FinancePanel() {
 
   return <>
     <div className="grid gap-3 sm:grid-cols-4">
-      <Metric label="Fee collection" value={isSummaryLoading ? 'Loading…' : money(summary?.fee_collection)} />
-      <Metric label="Other income" value={isSummaryLoading ? 'Loading…' : money(summary?.other_income)} />
-      <Metric label="Expenses" value={isSummaryLoading ? 'Loading…' : money(summary?.expenses)} />
-      <Metric label="Net income" value={isSummaryLoading ? 'Loading…' : money(summary?.net_income)} />
+      <Metric label="Fee collection" value={summaryFailed ? 'Unavailable' : summaryLoading ? 'Loading…' : money(summary?.fee_collection)} />
+      <Metric label="Other income" value={summaryFailed ? 'Unavailable' : summaryLoading ? 'Loading…' : money(summary?.other_income)} />
+      <Metric label="Expenses" value={summaryFailed ? 'Unavailable' : summaryLoading ? 'Loading…' : money(summary?.expenses)} />
+      <Metric label="Net income" value={summaryFailed ? 'Unavailable' : summaryLoading ? 'Loading…' : money(summary?.net_income)} />
     </div>
+    {summaryFailed && <button type="button" className="mt-3 text-sm font-semibold text-brand-700" onClick={() => void refetchSummary()}>Retry finance totals</button>}
 
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <Tabs
@@ -96,7 +101,7 @@ export function FinancePanel() {
 
     <div className="mt-4">
       <DataTable
-        loading={isLoading}
+        loading={entriesLoading}
         rows={entries?.data}
         pagination={entries?.pagination}
         onPage={setPage}
@@ -122,7 +127,7 @@ export function FinancePanel() {
     <Modal
       open={Boolean(editor)}
       onClose={() => setEditor(undefined)}
-      title={`${editor?.item?.id ? 'Edit' : 'Add'} ${editor ? labels[editor.kind] : activeLabel}`}
+      title={financeModalTitle(editor?.kind || kind, Boolean(editor?.item?.id))}
       size="md"
     >
       {editor && <FinanceForm

@@ -24,6 +24,12 @@ export default function FeesPage() {
     <PageHeader title="Fees & finance" description="Configure charges, generate invoices, collect partial payments and monitor school income." />
     {tab === 'invoices' && missingStudents && <div className="mb-4"><PrerequisiteNotice title="Invoices need enrolled students" description="Register students before creating invoices, or initialize the complete demo school from the Dashboard." actionLabel={classes.length ? 'Register students' : 'Create classes'} to={classes.length ? '/students' : '/academic'} /></div>}
     <Tabs tabs={[{ id: 'invoices', label: 'Invoices & collection' }, { id: 'structures', label: 'Fee structures' }, { id: 'heads', label: 'Fee heads' }, { id: 'finance', label: 'Income & expenses' }, { id: 'reminders', label: 'Fee reminders' }]} value={tab} onChange={setTab} />
-    <Card className="p-5">{tab === 'invoices' && <InvoicesPanel />}{tab === 'structures' && <FeeStructuresPanel />}{tab === 'heads' && <FeeHeadsPanel />}{tab === 'finance' && <FinancePanel />}{tab === 'reminders' && <FeeReminderPanel />}</Card>
+    <Card className="p-5">
+      {tab === 'invoices' && <InvoicesPanel />}
+      {tab === 'structures' && <FeeStructuresPanel />}
+      {tab === 'heads' && <FeeHeadsPanel />}
+      <div className={tab === 'finance' ? 'block' : 'hidden'}><FinancePanel /></div>
+      {tab === 'reminders' && <FeeReminderPanel />}
+    </Card>
   </>;
 }

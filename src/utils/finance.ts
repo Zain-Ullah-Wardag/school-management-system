@@ -8,3 +8,7 @@ export const financeSectionLabel: Record<FinanceKind, string> = {
 export function financeActionLabel(kind: FinanceKind) {
   return kind === 'expense' ? 'Add Expense' : 'Add Income';
 }
+
+export function financeModalTitle(kind: FinanceKind, editing = false) {
+  return `${editing ? 'Edit' : 'Add'} ${financeSectionLabel[kind]}`;
+}

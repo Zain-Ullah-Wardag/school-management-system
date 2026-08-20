@@ -81,18 +81,7 @@ function decorativeFrame() {
     <span aria-hidden="true" style="position:absolute;right:13px;bottom:8px;color:#b48b37;font-size:23px;line-height:1;transform:scale(-1)">❦</span>`;
 }
 
-function studentFacts(data: CertificateData, compact = false) {
-  const student = data.student;
-  const guardian = data.guardian_name || data.father_name || '—';
-  const cell = (label: string, value: string) => `<div style="min-width:${compact ? '108px' : '125px'};padding:${compact ? '5px 8px' : '7px 10px'};border-right:1px solid #d8e4dc"><div style="font-size:${compact ? '7.8px' : '8.5px'};font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#5b7665">${label}</div><div style="margin-top:2px;font-size:${compact ? '9.5px' : '10.5px'};font-weight:700;color:#173b29">${value}</div></div>`;
-  return `<div style="display:flex;flex-wrap:wrap;border:1px solid #d8e4dc;border-radius:4px;overflow:hidden;background:rgba(248,252,249,.92)">
-    ${cell('Registration No.', studentValue(student, 'admission_no'))}
-    ${cell('Roll No.', studentValue(student, 'roll_no'))}
-    ${cell('Class / Section', `${studentValue(student, 'class_name')} ${studentValue(student, 'section_name')}`)}
-    ${cell('Academic Session', studentValue(student, 'session_name'))}
-    ${cell('Father / Guardian', escapeHtml(guardian))}
-  </div>`;
-}
+
 
 /**
  * Shared certificate renderer. Content/data comes from the one reports API; the
@@ -105,7 +94,6 @@ export function buildProfessionalCertificate(data: CertificateData, layout: Cert
   const watermark = escapeHtml((data.name || 'School').toUpperCase());
   const verticalPadding = landscape ? '10mm' : '13mm';
   const horizontalPadding = landscape ? '14mm' : '15mm';
-  const contentMargin = landscape ? '11mm' : '18mm';
   const documentHeight = landscape ? '164mm' : '245mm';
   const photo = photoMarkup(student, landscape ? '31mm' : '32mm', landscape ? '38mm' : '40mm');
 
@@ -135,11 +123,7 @@ export function buildProfessionalCertificate(data: CertificateData, layout: Cert
       ${renderCertificateBody(data)}
     </div>
 
-    <div style="position:relative;margin-top:${contentMargin}">
-      ${studentFacts(data, landscape)}
-    </div>
-
-    <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-top:${landscape ? '10mm' : '22mm'};font-size:10.5px">
+    <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-top:${landscape ? '14mm' : '28mm'};font-size:10.5px">
       <div style="line-height:1.7;color:#294735"><strong>Issue Date:</strong> ${escapeHtml(data.issue_date || '—')}<br/><strong>Academic Session:</strong> ${studentValue(student, 'session_name')}</div>
       <div style="min-width:50mm;text-align:center;color:#173425"><div style="height:23px;border-bottom:1px solid #748a7a"></div><div style="margin-top:4px;font-size:11px;font-weight:800">${escapeHtml(data.principal_name || 'Principal')}</div><div style="margin-top:2px;font-size:8.5px;color:#5b7162">Principal Signature & Official School Seal</div></div>
     </div>

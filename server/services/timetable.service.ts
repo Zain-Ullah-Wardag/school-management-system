@@ -1,6 +1,7 @@
 import { getDatabase } from '../../database';
 import { ApiError } from '../utils/errors';
 import { required } from '../utils/http';
+import { applyLessonDuration, type PeriodClock } from '../utils/periods';
 import { nullable, number } from '../utils/serializers';
 
 export class TimetableService {
@@ -11,10 +12,20 @@ export class TimetableService {
   saveSettings(input: Record<string, unknown>) {
     const db = getDatabase();
     db.transaction(() => {
-      db.prepare(`UPDATE timetable_settings SET school_days_json=?,default_period_minutes=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`).run(JSON.stringify(Array.isArray(input.school_days) ? input.school_days : [1,2,3,4,5]), number(input.default_period_minutes, 40));
+      const lessonMinutes = number(input.default_period_minutes, 40);
+      if (lessonMinutes < 1 || lessonMinutes > 240) throw new ApiError(422, 'Default lesson duration must be between 1 and 240 minutes');
+      db.prepare(`UPDATE timetable_settings SET school_days_json=?,default_period_minutes=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`).run(JSON.stringify(Array.isArray(input.school_days) ? input.school_days : [1,2,3,4,5]), lessonMinutes);
       if (Array.isArray(input.days)) {
         const update = db.prepare('UPDATE school_days SET is_school_day=?,start_time=?,end_time=? WHERE weekday=?');
         input.days.forEach((raw) => { const day = raw as Record<string, unknown>; update.run(day.is_school_day ? 1 : 0, nullable(day.start_time), nullable(day.end_time), Number(day.weekday)); });
+      }
+      const periods = db.prepare('SELECT id,sequence,start_time,end_time,period_type FROM timetable_periods ORDER BY sequence,id').all() as PeriodClock[];
+      try {
+        const next = applyLessonDuration(periods, lessonMinutes);
+        const updatePeriod = db.prepare('UPDATE timetable_periods SET start_time=?,end_time=? WHERE id=?');
+        next.forEach((period) => updatePeriod.run(period.start_time, period.end_time, period.id));
+      } catch (error) {
+        throw new ApiError(422, error instanceof Error ? error.message : 'Period times could not be recalculated');
       }
     })(); return this.settings();
   }

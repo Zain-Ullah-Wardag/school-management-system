@@ -155,7 +155,16 @@ function TimetableSettings({ settings, onChanged }: { settings: any; onChanged: 
   const days = settings?.school_days || [];
   const { register, handleSubmit } = useForm<any>({ defaultValues: settings?.settings });
   const saveDuration = async (values: any) => {
-    try { await schoolApi.timetable.saveSettings({ ...values, days }); await onChanged(); toast('success', 'Timetable settings saved'); }
+    try {
+      await schoolApi.timetable.saveSettings({
+        ...values,
+        days,
+        school_days: days.filter((item: any) => item.is_school_day).map((item: any) => item.weekday),
+        default_period_minutes: Number(values.default_period_minutes)
+      });
+      await onChanged();
+      toast('success', 'Lesson duration saved and period times updated');
+    }
     catch (error) { toast('error', 'Could not save settings', apiError(error)); }
   };
   const toggleDay = async (day: any, checked: boolean) => {
