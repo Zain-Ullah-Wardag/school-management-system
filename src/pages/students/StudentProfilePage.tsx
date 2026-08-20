@@ -116,11 +116,7 @@ export default function StudentProfilePage() {
           <Metric label="Emergency contact" value={student.emergency_contact || student.phone || 'Not entered'} detail="For urgent school communication" />
         </div>
         <Card>
-<<<<<<< HEAD
-          <CardHeader title="Attendance history" description="The summary is calculated from the same saved rows shown below and refreshes as soon as attendance is saved." action={isAttendanceLoading ? <span className="text-xs text-slate-400">Loading…</span> : <Badge value={attendance?.today_status && attendance.today_status !== 'not_marked' ? attendance.today_status : (attendance?.current_status || 'not_marked')} />} />
-=======
           <CardHeader title="Attendance history" description="The summary is calculated from the same saved rows shown below and refreshes as soon as attendance is saved." action={attendanceLoading ? <span className="text-xs text-slate-400">Loading…</span> : attendanceFailed ? <button type="button" className="text-xs font-semibold text-brand-700" onClick={() => void refetchAttendance()}>Retry</button> : <Badge value={attendance?.today_status && attendance.today_status !== 'not_marked' ? attendance.today_status : (attendance?.current_status || 'not_marked')} />} />
->>>>>>> ad3fe84 (Fix academic actions, timetable duration, finance loading, and certificate layout)
           <div className="grid grid-cols-2 divide-x divide-y divide-slate-100 border-b border-slate-100 md:grid-cols-4 md:divide-y-0">
             <AttendanceCount label="Present days" value={attendance?.present_days ?? 0} tone="brand" />
             <AttendanceCount label="Absent days" value={attendance?.absent_days ?? 0} tone="rose" />
