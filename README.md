@@ -35,11 +35,20 @@ To open the Electron desktop shell during development:
 npm run dev:desktop
 ```
 
-To build a distributable Electron package:
+Use **Node.js 20** for this project. Native dependencies such as `better-sqlite3`,
+`bcrypt`, and `serialport` are rebuilt for Electron during packaging and are not
+supported by this project configuration under Node.js 24.
+
+To build the Windows installer on Windows:
 
 ```bash
-npm run package
+npm ci
+npm run package:win
 ```
+
+The NSIS installer is written to `artifacts/School ERP Setup 1.0.0.exe`.
+You can also open the repository's **Actions** tab, run **Build Windows Installer**,
+and download the `school-erp-windows-installer` artifact after the workflow finishes.
 
 ### First sign-in
 
@@ -85,6 +94,8 @@ When `JWT_SECRET` is omitted, the local server creates and persists a random loc
 | `npm run test:smoke` | Runs an isolated end-to-end SQLite/API smoke test |
 | `npm test` | Alias for the full smoke test |
 | `npm run package` | Builds then invokes electron-builder |
+| `npm run package:win` | Builds the Windows x64 NSIS `.exe` installer |
+| `npm run package:dir` | Builds an unpacked desktop directory for testing |
 | `npm run start:lan` | Serves the built ERP and API together for LAN browser clients |
 
 ## Architecture
