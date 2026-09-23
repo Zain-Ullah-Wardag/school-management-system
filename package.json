@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "description": "Offline-first Electron school management ERP",
+  "packageManager": "npm@10.9.4",
+  "engines": {
+    "node": ">=20 <21",
+    "npm": ">=10 <11"
+  },
   "main": "release/electron/main.js",
   "scripts": {
     "dev": "concurrently -k -n SERVER,WEB -c green,cyan \"npm:dev:server\" \"npm:dev:web\"",
@@ -17,14 +22,16 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
     "package": "npm run build && electron-builder",
-    "test:smoke": "tsx scripts/smoke-test.ts",
+    "package:win": "npm run build && electron-builder --win nsis --x64",
+    "package:dir": "npm run build && electron-builder --dir",
+    "test:smoke": "node --import tsx scripts/smoke-test.ts",
     "test": "npm run test:smoke",
-    "test:auth": "tsx scripts/auth-user-test.ts",
-    "test:demo": "tsx scripts/demo-seed-test.ts",
+    "test:auth": "node --import tsx scripts/auth-user-test.ts",
+    "test:demo": "node --import tsx scripts/demo-seed-test.ts",
     "start:lan": "cross-env SERVE_RENDERER=true node release/server/index.js",
-    "test:reset": "tsx scripts/reset-test.ts",
-    "test:audit": "tsx scripts/audit-regression-test.ts",
-    "test:sync": "tsx scripts/data-sync-test.ts"
+    "test:reset": "node --import tsx scripts/reset-test.ts",
+    "test:audit": "node --import tsx scripts/audit-regression-test.ts",
+    "test:sync": "node --import tsx scripts/data-sync-test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

@@ -30,7 +30,7 @@ async function waitForApi() {
 async function run() {
   await fs.rm(tempRoot, { recursive: true, force: true });
   await fs.mkdir(tempRoot, { recursive: true });
-  const child = spawn(process.execPath, [path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     cwd: root,
     env: { ...process.env, PORT: String(port), DATABASE_PATH: dbPath, UPLOAD_DIR: uploadPath, JWT_SECRET: 'smoke-test-secret' },
     stdio: ['ignore', 'pipe', 'pipe']
