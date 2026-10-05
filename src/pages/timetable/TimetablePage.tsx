@@ -15,6 +15,7 @@ import { apiError } from '../../services/api';
 import { escapeHtml, printHtml } from '../../utils/print';
 import { queryKeys } from '../../services/queryKeys';
 import { useDataSync } from '../../hooks/useDataSync';
+import { useAuth } from '../../context/AuthContext';
 
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -29,6 +30,8 @@ export default function TimetablePage() {
   const synchronize = useDataSync();
   const { toast } = useToast();
   const { query: globalQuery } = useGlobalSearch();
+  const { can } = useAuth();
+  const canManage = can('timetable.manage');
 
   const { data: classes = [], isLoading: isClassesLoading } = useQuery({ queryKey: queryKeys.academic.classes(), queryFn: schoolApi.academic.classes });
   const { data: sections = [], isLoading: isSectionsLoading } = useQuery({ queryKey: queryKeys.academic.sections(), queryFn: schoolApi.academic.sections });
@@ -80,9 +83,9 @@ export default function TimetablePage() {
       title="Timetable"
       description="Design weekly schedules with periods, breaks, subject teachers and rooms."
       actions={<>
-        <Button variant="outline" icon={<Settings2 className="h-4 w-4" />} onClick={() => setSettingsOpen(true)}>Configure periods</Button>
+        {canManage && <Button variant="outline" icon={<Settings2 className="h-4 w-4" />} onClick={() => setSettingsOpen(true)}>Configure periods</Button>}
         <Button variant="outline" icon={<Printer className="h-4 w-4" />} disabled={!classId} onClick={() => void printTimetable()}>Print timetable</Button>
-        <Button icon={<Plus className="h-4 w-4" />} disabled={!classId || !canPlanLessons} onClick={() => newEntry(days[0]?.weekday || 1, periods.find((period: any) => period.period_type === 'lesson')?.id || '')}>Add lesson</Button>
+        {canManage && <Button icon={<Plus className="h-4 w-4" />} disabled={!classId || !canPlanLessons} onClick={() => newEntry(days[0]?.weekday || 1, periods.find((period: any) => period.period_type === 'lesson')?.id || '')}>Add lesson</Button>}
       </>}
     />
 
@@ -110,7 +113,7 @@ export default function TimetablePage() {
               const item = entryMap.get(`${day.weekday}-${period.id}`) as any;
               if (period.period_type !== 'lesson') return <td key={day.weekday} className="border-b border-slate-100 p-1.5"><div className="rounded-xl bg-amber-50 px-3 py-4 text-center text-xs font-bold uppercase tracking-wide text-amber-700">{period.name}</div></td>;
               return <td key={day.weekday} className="border-b border-slate-100 p-1.5">
-                <button disabled={!item && !canPlanLessons} onClick={() => item ? setEditor(item) : canPlanLessons && newEntry(day.weekday, period.id)} className={`min-h-20 w-full rounded-xl p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-55 ${item ? 'bg-brand-50 hover:bg-brand-100' : 'border border-dashed border-slate-200 text-slate-400 hover:border-brand-300 hover:bg-brand-50'}`}>
+                <button disabled={!canManage || (!item && !canPlanLessons)} onClick={() => canManage && (item ? setEditor(item) : canPlanLessons && newEntry(day.weekday, period.id))} className={`min-h-20 w-full rounded-xl p-3 text-left transition disabled:cursor-default ${item ? 'bg-brand-50' : 'border border-dashed border-slate-200 text-slate-400'} ${canManage ? 'hover:border-brand-300 hover:bg-brand-100' : ''}`}>
                   {item ? <><p className="font-bold text-brand-900">{item.subject_name || 'Unassigned'}</p><p className="mt-1 text-xs text-brand-700">{item.teacher_name || 'Teacher pending'}</p><p className="mt-1 text-[11px] text-brand-600">{item.room_name || ''}</p></> : <span className="inline-flex items-center gap-1 text-xs font-semibold"><Plus className="h-3.5 w-3.5" />Add lesson</span>}
                 </button>
               </td>;
@@ -174,10 +177,11 @@ function TimetableSettings({ settings, onChanged }: { settings: any; onChanged: 
 }
 
 function PeriodForm({ period, onClose, onSaved }: { period: any; onClose: () => void; onSaved: (values: any) => void }) {
-  const { register, handleSubmit } = useForm({ defaultValues: period });
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<any>({ defaultValues: period });
+  const startTime = watch('start_time');
   return <form onSubmit={handleSubmit(onSaved)} className="space-y-4">
     <Field label="Period name"><TextInput {...register('name', { required: true })} /></Field>
-    <div className="grid grid-cols-3 gap-3"><Field label="Sequence"><TextInput type="number" {...register('sequence', { required: true })} /></Field><Field label="Start"><TextInput type="time" {...register('start_time', { required: true })} /></Field><Field label="End"><TextInput type="time" {...register('end_time', { required: true })} /></Field></div>
+    <div className="grid grid-cols-3 gap-3"><Field label="Sequence"><TextInput type="number" {...register('sequence', { required: true })} /></Field><Field label="Start" error={errors.start_time}><TextInput type="time" {...register('start_time', { required: 'Start time is required' })} /></Field><Field label="End" error={errors.end_time}><TextInput type="time" min={startTime || undefined} {...register('end_time', { required: 'End time is required', validate: (value) => !startTime || value > startTime || 'End time must be after the start time' })} /></Field></div>
     <Field label="Type"><SelectInput {...register('period_type')}><option value="lesson">Lesson</option><option value="break">Break</option><option value="assembly">Assembly</option><option value="other">Other</option></SelectInput></Field>
     <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save period</Button></div>
   </form>;

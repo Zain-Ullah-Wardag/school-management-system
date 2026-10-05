@@ -17,21 +17,25 @@
     "build": "npm run build:server && npm run build:web",
     "build:server": "tsc -p tsconfig.server.json && tsc -p tsconfig.electron.json",
     "build:web": "tsc --noEmit && vite build",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3,bcrypt,@serialport/bindings-cpp",
     "start": "electron .",
     "start:server": "node release/server/index.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
-    "package": "npm run build && electron-builder",
-    "package:win": "npm run build && electron-builder --win nsis --x64",
-    "package:dir": "npm run build && electron-builder --dir",
+    "package": "npm run build && npm run rebuild:electron && electron-builder",
+    "package:win": "npm run build && npm run rebuild:electron && electron-builder --win nsis --x64",
+    "package:dir": "npm run build && npm run rebuild:electron && electron-builder --dir",
     "test:smoke": "node --import tsx scripts/smoke-test.ts",
     "test": "npm run test:smoke",
     "test:auth": "node --import tsx scripts/auth-user-test.ts",
+    "test:exam-completeness": "node --import tsx scripts/exam-completeness-test.ts",
+    "test:qa-validation": "node --import tsx scripts/qa-validation-test.ts",
     "test:demo": "node --import tsx scripts/demo-seed-test.ts",
     "start:lan": "cross-env SERVE_RENDERER=true node release/server/index.js",
     "test:reset": "node --import tsx scripts/reset-test.ts",
     "test:audit": "node --import tsx scripts/audit-regression-test.ts",
-    "test:sync": "node --import tsx scripts/data-sync-test.ts"
+    "test:sync": "node --import tsx scripts/data-sync-test.ts",
+    "test:localization": "node --import tsx scripts/language-localization-test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -56,6 +60,7 @@
     "@serialport/parser-readline": "^12.0.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.1",
     "@types/bcrypt": "^5.0.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/cors": "^2.8.17",
@@ -84,6 +89,7 @@
   "build": {
     "appId": "pk.edu.schoolerp",
     "productName": "School ERP",
+    "npmRebuild": false,
     "directories": {
       "output": "artifacts"
     },

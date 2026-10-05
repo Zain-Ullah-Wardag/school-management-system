@@ -90,9 +90,23 @@ function translate(source: string, language: Language) {
   return Object.keys(urdu).sort((a, b) => b.length - a.length).reduce((text, phrase) => text.replace(new RegExp(escapeRegExp(phrase), 'g'), urdu[phrase]), source);
 }
 
+export type LocalizedValueState = { source: string; rendered: string };
+
+/**
+ * Preserve the latest value written by React, while still remembering its
+ * untranslated source for language switching. `previous.rendered` is the
+ * value written by this localizer; any different current value came from the
+ * application and must become the new source instead of being overwritten.
+ */
+export function resolveLocalizedValue(current: string, language: Language, previous?: LocalizedValueState) {
+  const source = previous && current === previous.rendered ? previous.source : current;
+  const rendered = translate(source, language);
+  return { source, rendered };
+}
+
 function useDocumentLocalization(language: Language) {
-  const originals = useRef(new WeakMap<Text, string>());
-  const attributeOriginals = useRef(new WeakMap<Element, Map<string, string>>());
+  const textStates = useRef(new WeakMap<Text, LocalizedValueState>());
+  const attributeStates = useRef(new WeakMap<Element, Map<string, LocalizedValueState>>());
 
   useEffect(() => {
     const root = document.getElementById('root');
@@ -100,21 +114,20 @@ function useDocumentLocalization(language: Language) {
     const isIgnored = (element: Element | null) => Boolean(element?.closest('script, style, code, pre, textarea, [data-no-translate]'));
     const localizeText = (node: Text) => {
       if (!node.parentElement || isIgnored(node.parentElement)) return;
-      if (!originals.current.has(node)) originals.current.set(node, node.data);
-      const source = originals.current.get(node) || '';
-      const desired = translate(source, language);
-      if (node.data !== desired) node.data = desired;
+      const state = resolveLocalizedValue(node.data, language, textStates.current.get(node));
+      textStates.current.set(node, state);
+      if (node.data !== state.rendered) node.data = state.rendered;
     };
     const localizeElement = (element: Element) => {
       if (isIgnored(element)) return;
       ['placeholder', 'title', 'aria-label'].forEach((attribute) => {
         const current = element.getAttribute(attribute);
         if (!current) return;
-        let originalsForElement = attributeOriginals.current.get(element);
-        if (!originalsForElement) { originalsForElement = new Map(); attributeOriginals.current.set(element, originalsForElement); }
-        if (!originalsForElement.has(attribute)) originalsForElement.set(attribute, current);
-        const desired = translate(originalsForElement.get(attribute) || current, language);
-        if (current !== desired) element.setAttribute(attribute, desired);
+        let statesForElement = attributeStates.current.get(element);
+        if (!statesForElement) { statesForElement = new Map(); attributeStates.current.set(element, statesForElement); }
+        const state = resolveLocalizedValue(current, language, statesForElement.get(attribute));
+        statesForElement.set(attribute, state);
+        if (current !== state.rendered) element.setAttribute(attribute, state.rendered);
       });
     };
     const walk = (node: Node) => {

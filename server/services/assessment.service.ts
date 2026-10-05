@@ -1,7 +1,7 @@
 import { getDatabase } from '../../database';
 import { ApiError } from '../utils/errors';
 import { pagination, required } from '../utils/http';
-import { nullable, number, today } from '../utils/serializers';
+import { nullable, number, schoolTimeZone, today } from '../utils/serializers';
 import { ResultService } from './result.service';
 
 const session = () => {
@@ -31,6 +31,14 @@ function formatTotal(total: number) {
   return Number.isInteger(total) ? String(total) : String(Number(total.toFixed(2)));
 }
 
+function optionalIsoDate(value: unknown, label: string) {
+  if (value === null || value === undefined || value === '' || (typeof value === 'string' && !value.trim())) return null;
+  const date = String(value).trim();
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new ApiError(422, `${label} must be a valid date`);
+  return date;
+}
+
 /**
  * Decimal marks are supported because both marks columns use SQLite REAL values.
  * An empty mark intentionally remains null (not zero) until the teacher enters it.
@@ -52,6 +60,16 @@ function enrolledStudentIds(sessionId: number, classId: number, sectionId: unkno
   `).all(sessionId, classId, sectionId) as { student_id: number }[];
   return new Set(rows.map((row) => row.student_id));
 }
+
+type MissingExamMark = {
+  admission_no: string;
+  first_name: string;
+  last_name: string | null;
+  roll_no: string | null;
+  class_name: string;
+  section_name: string | null;
+  subject_name: string;
+};
 
 export class AssessmentService {
   tests(query: Record<string, unknown>) {
@@ -153,12 +171,16 @@ export class AssessmentService {
 
   saveExam(input: Record<string, unknown>, actor: number, id?: number) {
     const db = getDatabase();
+    const startsOn = optionalIsoDate(input.starts_on, 'Exam start date');
+    const endsOn = optionalIsoDate(input.ends_on, 'Exam end date');
+    if (startsOn && endsOn && endsOn < startsOn) throw new ApiError(422, 'Exam end date must be on or after the start date');
+    if (id) this.requireSubjectsWithinExamRange(id, startsOn, endsOn);
     const values = [
       required(input.name, 'Exam name'),
       nullable(input.exam_type_id),
       Number(input.session_id) || session(),
-      nullable(input.starts_on),
-      nullable(input.ends_on),
+      startsOn,
+      endsOn,
       number(input.class_test_weight, settingNumber('exam.class_test_weight', 25)),
       number(input.exam_weight, settingNumber('exam.term_weight', 75)),
       input.status || 'draft',
@@ -178,11 +200,14 @@ export class AssessmentService {
 
   saveExamSubject(examId: number, input: Record<string, unknown>, id?: number) {
     const db = getDatabase();
-    if (!db.prepare('SELECT 1 FROM exams WHERE id=?').get(examId)) throw new ApiError(404, 'Exam not found');
+    const exam = db.prepare('SELECT starts_on,ends_on FROM exams WHERE id=?').get(examId) as { starts_on: string | null; ends_on: string | null } | undefined;
+    if (!exam) throw new ApiError(404, 'Exam not found');
     const totalMarks = requiredFiniteNumber(input.total_marks ?? 100, 'Total marks');
     const passingMarks = requiredFiniteNumber(input.passing_marks ?? 40, 'Passing marks');
     validateMarksConfiguration(totalMarks, passingMarks);
-    const values = [examId, Number(input.class_id), nullable(input.section_id), Number(input.subject_id), nullable(input.teacher_id), nullable(input.exam_date), totalMarks, passingMarks];
+    const examDate = optionalIsoDate(input.exam_date, 'Subject exam date');
+    this.requireSubjectDateWithinExamRange(examDate, exam.starts_on, exam.ends_on, Number(input.subject_id));
+    const values = [examId, Number(input.class_id), nullable(input.section_id), Number(input.subject_id), nullable(input.teacher_id), examDate, totalMarks, passingMarks];
     if (!values[1] || !values[3]) throw new ApiError(422, 'Class and subject are required');
     if (id) {
       if (!db.prepare('UPDATE exam_subjects SET class_id=?,section_id=?,subject_id=?,teacher_id=?,exam_date=?,total_marks=?,passing_marks=? WHERE id=? AND exam_id=?').run(...values.slice(1), id, examId).changes) throw new ApiError(404, 'Exam subject not found');
@@ -220,12 +245,91 @@ export class AssessmentService {
     return this.marks(examSubjectId);
   }
 
+  private missingExamMarks(examId: number) {
+    return getDatabase().prepare(`
+      SELECT s.admission_no,s.first_name,s.last_name,en.roll_no,c.name class_name,
+        sec.name section_name,sub.name subject_name
+      FROM exam_subjects es
+      JOIN exams ex ON ex.id=es.exam_id
+      JOIN enrollments en ON en.session_id=ex.session_id
+        AND en.class_id=es.class_id AND en.section_id IS es.section_id AND en.status='active'
+      JOIN students s ON s.id=en.student_id AND s.status='active'
+      JOIN classes c ON c.id=es.class_id
+      LEFT JOIN sections sec ON sec.id=es.section_id
+      JOIN subjects sub ON sub.id=es.subject_id
+      LEFT JOIN exam_marks em ON em.exam_subject_id=es.id AND em.student_id=s.id
+      WHERE es.exam_id=? AND (em.id IS NULL OR em.obtained_marks IS NULL)
+      ORDER BY c.display_order,sec.name,CAST(en.roll_no AS INTEGER),s.first_name,sub.name
+    `).all(examId) as MissingExamMark[];
+  }
+
+  private requireSubjectDateWithinExamRange(examDate: string | null, startsOn: string | null, endsOn: string | null, subjectId: number) {
+    if (!examDate || ((!startsOn || examDate >= startsOn) && (!endsOn || examDate <= endsOn))) return;
+    const subject = getDatabase().prepare('SELECT name FROM subjects WHERE id=?').get(subjectId) as { name: string } | undefined;
+    const range = startsOn && endsOn ? `${startsOn} through ${endsOn}` : startsOn ? `${startsOn} or later` : `${endsOn} or earlier`;
+    throw new ApiError(422, `${subject?.name || 'Subject'} exam date ${examDate} must be within the parent exam range (${range})`);
+  }
+
+  private requireSubjectsWithinExamRange(examId: number, startsOn: string | null, endsOn: string | null) {
+    const outside = getDatabase().prepare(`
+      SELECT sub.name subject_name,es.exam_date FROM exam_subjects es
+      JOIN subjects sub ON sub.id=es.subject_id
+      WHERE es.exam_id=? AND es.exam_date IS NOT NULL
+        AND ((? IS NOT NULL AND es.exam_date<?) OR (? IS NOT NULL AND es.exam_date>?))
+      ORDER BY es.exam_date,sub.name
+    `).all(examId, startsOn, startsOn, endsOn, endsOn) as { subject_name: string; exam_date: string }[];
+    if (!outside.length) return;
+    const entries = outside.map((item) => `${item.subject_name} — ${item.exam_date}`).join('; ');
+    throw new ApiError(422, `The exam date range cannot exclude existing subject dates. Outside entries: ${entries}`);
+  }
+
+  private requireCompleteExamMarks(examId: number, action: 'approve' | 'publish') {
+    const missing = this.missingExamMarks(examId);
+    if (!missing.length) return;
+    const entries = missing.map((item) => {
+      const student = `${item.first_name}${item.last_name ? ` ${item.last_name}` : ''}`;
+      const placement = `${item.class_name}${item.section_name ? `/${item.section_name}` : ''}`;
+      const identity = item.roll_no ? `${item.admission_no}, roll ${item.roll_no}` : item.admission_no;
+      return `${student} (${identity}, ${placement}) — ${item.subject_name}`;
+    });
+    const label = missing.length === 1 ? 'mark is' : 'marks are';
+    throw new ApiError(
+      422,
+      `This exam cannot be ${action === 'approve' ? 'approved' : 'published'} because ${missing.length} ${label} missing. Missing entries: ${entries.join('; ')}. Enter every mark; use numeric 0 only when zero was actually awarded.`,
+      { code: 'INCOMPLETE_EXAM_MARKS', missing }
+    );
+  }
+
+  private requireScheduledSubjectsHeld(examId: number, action: 'approve' | 'publish') {
+    const schoolDate = today();
+    const future = getDatabase().prepare(`
+      SELECT sub.name subject_name,c.name class_name,sec.name section_name,es.exam_date
+      FROM exam_subjects es
+      JOIN subjects sub ON sub.id=es.subject_id
+      JOIN classes c ON c.id=es.class_id
+      LEFT JOIN sections sec ON sec.id=es.section_id
+      WHERE es.exam_id=? AND es.exam_date>?
+      ORDER BY es.exam_date,c.display_order,sec.name,sub.name
+    `).all(examId, schoolDate) as { subject_name: string; class_name: string; section_name: string | null; exam_date: string }[];
+    if (!future.length) return;
+    const entries = future.map((item) => `${item.subject_name} (${item.class_name}${item.section_name ? `/${item.section_name}` : ''}) — ${item.exam_date}`).join('; ');
+    throw new ApiError(
+      422,
+      `This exam cannot be ${action === 'approve' ? 'approved' : 'published'} before its scheduled subject exams are held. Future subject exams: ${entries}. School date: ${schoolDate} (${schoolTimeZone()}).`,
+      { code: 'SUBJECT_EXAM_DATE_NOT_REACHED', school_date: schoolDate, timezone: schoolTimeZone(), subjects: future }
+    );
+  }
+
   transition(examId: number, action: 'submit' | 'approve' | 'publish', actor: number) {
     const db = getDatabase();
     const exam = db.prepare('SELECT status FROM exams WHERE id=?').get(examId) as { status: string } | undefined;
     if (!exam) throw new ApiError(404, 'Exam not found');
     const allowed = { submit: ['draft', 'marks_entry'], approve: ['submitted'], publish: ['approved'] } as Record<string, string[]>;
     if (!allowed[action].includes(exam.status)) throw new ApiError(422, `This exam cannot be ${action}ed from its current status`);
+    if (action === 'approve' || action === 'publish') {
+      this.requireCompleteExamMarks(examId, action);
+      this.requireScheduledSubjectsHeld(examId, action);
+    }
     if (action === 'approve') db.prepare("UPDATE exams SET status='approved',approved_by=?,approved_at=CURRENT_TIMESTAMP WHERE id=?").run(actor, examId);
     else db.prepare('UPDATE exams SET status=? WHERE id=?').run(action === 'submit' ? 'submitted' : 'published', examId);
     return this.exam(examId);

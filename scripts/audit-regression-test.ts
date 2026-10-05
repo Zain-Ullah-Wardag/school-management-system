@@ -36,6 +36,20 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+function enrollmentSnapshot(student: any) {
+  return student.enrollments.map((entry: any) => ({
+    id: entry.id,
+    student_id: entry.student_id,
+    session_id: entry.session_id,
+    class_id: entry.class_id,
+    section_id: entry.section_id,
+    roll_no: entry.roll_no,
+    started_on: entry.started_on,
+    ended_on: entry.ended_on,
+    status: entry.status
+  }));
+}
+
 async function waitForApi() {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
@@ -62,7 +76,7 @@ async function run() {
   let server: ChildProcess | undefined;
 
   try {
-    server = spawn(process.execPath, [path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
+    server = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
       cwd: root,
       env: {
         ...process.env,
@@ -95,6 +109,40 @@ async function run() {
       class_id: schoolClass.id, section_id: section.id, roll_no: '1', phone: '03000000000',
       contacts: [{ contact_type: 'father', full_name: 'Audit Guardian', phone: '03000000000', is_primary: true }]
     });
+
+    // Reproduce BUG-077's valid legacy state: assigned class/section with no roll.
+    // The old edit form then sent a temporarily blank section and null roll even
+    // though the operator changed only the name.
+    const enrollmentSetup = new Database(databasePath);
+    enrollmentSetup.prepare(`UPDATE enrollments SET roll_no=NULL WHERE student_id=? AND status='active'`).run(student.id);
+    enrollmentSetup.close();
+    const beforeNameEdit = await api<any>('GET', `/students/${student.id}`);
+    const enrollmentBefore = enrollmentSnapshot(beforeNameEdit);
+    assert(beforeNameEdit.section_id === section.id && beforeNameEdit.roll_no === null, 'BUG-077 setup did not preserve the assigned section and blank roll');
+
+    const editedStudent = await api<any>('PATCH', `/students/${student.id}`, {
+      first_name: 'Audit احمد',
+      class_id: beforeNameEdit.class_id,
+      section_id: null,
+      session_id: beforeNameEdit.session_id,
+      roll_no: null,
+      contacts: beforeNameEdit.contacts
+    });
+    assert(editedStudent.first_name === 'Audit احمد', 'Urdu name-only edit was not saved');
+    assert(editedStudent.class_id === schoolClass.id && editedStudent.section_id === section.id && editedStudent.roll_no === null, 'Immediate profile response changed enrollment during a name-only edit');
+    assert(JSON.stringify(enrollmentSnapshot(editedStudent)) === JSON.stringify(enrollmentBefore), 'Immediate profile response changed enrollment history during a name-only edit');
+
+    const studentList = await api<{ data: any[] }>('GET', '/students?search=AUD-001');
+    const listedStudent = studentList.data.find((entry) => entry.id === student.id);
+    assert(listedStudent?.first_name === 'Audit احمد' && listedStudent.class_id === schoolClass.id && listedStudent.section_id === section.id && listedStudent.roll_no === null, 'Student list disagreed with the preserved enrollment after a name-only edit');
+
+    const reopenedStudent = await api<any>('GET', `/students/${student.id}`);
+    assert(reopenedStudent.first_name === 'Audit احمد' && reopenedStudent.class_id === schoolClass.id && reopenedStudent.section_id === section.id && reopenedStudent.roll_no === null, 'Reopened student profile disagreed after a name-only edit');
+    assert(JSON.stringify(enrollmentSnapshot(reopenedStudent)) === JSON.stringify(enrollmentBefore), 'Reopened student profile changed enrollment history');
+
+    const editedBonafide = await api<any>('GET', `/reports/certificate/${student.id}?type=bonafide`);
+    assert(editedBonafide.certificate_values.student_name === 'Audit احمد Student', 'Bonafide certificate missed the Urdu name edit');
+    assert(editedBonafide.certificate_values.class === 'Audit Class' && editedBonafide.certificate_values.section === 'A' && editedBonafide.certificate_values.roll_number === '', 'Bonafide certificate disagreed with the preserved class, section, or blank roll');
 
     // Attendance summary must be a direct aggregate of the saved history rows.
     await api('POST', '/attendance', { attendance_date: '2026-08-10', class_id: schoolClass.id, section_id: section.id, records: [{ student_id: student.id, status: 'present' }] });
@@ -165,7 +213,7 @@ async function run() {
     }
     assert(databaseGuarded, 'Database marks trigger did not reject an over-total direct write');
 
-    console.log('Audit regression test passed: fresh dashboard API session, income/expense CRUD and net totals, centralized certificate types, frontend-backed marks rules/API/database guards, and attendance history summaries.');
+    console.log('Audit regression test passed: name-only Urdu student edits preserve list/profile/certificate enrollment data and history; fresh dashboard API session, income/expense CRUD and net totals, centralized certificate types, frontend-backed marks rules/API/database guards, and attendance history summaries.');
   } finally {
     if (server) await stop(server);
     await fs.rm(temporary, { recursive: true, force: true });

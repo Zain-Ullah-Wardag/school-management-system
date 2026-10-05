@@ -8,11 +8,12 @@ export type SubjectResult = {
   passing_marks: number;
   class_test_percent: number;
   exam_marks: number | null;
-  exam_percent: number;
-  total_percent: number;
+  exam_percent: number | null;
+  total_percent: number | null;
   grade: string;
-  gpa: number;
-  status: 'Pass' | 'Fail';
+  gpa: number | null;
+  status: 'Pass' | 'Fail' | 'Incomplete';
+  is_complete: boolean;
   remarks: string | null;
 };
 
@@ -31,10 +32,10 @@ export class ResultService {
     const passing = Number((db.prepare("SELECT value FROM settings WHERE key='school.passing_percentage'").get() as { value: string } | undefined)?.value || 40);
     const details = subjects.map((subject) => this.subjectResult(exam, subject, studentId, classId, sectionId, passing));
     const totalMarks = subjects.reduce((sum, subject) => sum + Number(subject.total_marks || 0), 0);
-    const obtainedMarks = subjects.reduce((sum, subject) => sum + Number(subject.obtained_marks ?? 0), 0);
-    const percentage = details.length ? details.reduce((sum, subject) => sum + subject.total_percent, 0) / details.length : 0;
     const complete = details.length > 0 && subjects.every((subject) => subject.obtained_marks !== null && subject.obtained_marks !== undefined);
-    const status: 'Pass' | 'Fail' = complete && percentage >= passing && details.every((subject) => subject.status === 'Pass') ? 'Pass' : 'Fail';
+    const obtainedMarks = complete ? subjects.reduce((sum, subject) => sum + Number(subject.obtained_marks), 0) : null;
+    const percentage = complete ? details.reduce((sum, subject) => sum + Number(subject.total_percent), 0) / details.length : null;
+    const status: 'Pass' | 'Fail' | 'Incomplete' = !complete || percentage === null ? 'Incomplete' : percentage >= passing && details.every((subject) => subject.status === 'Pass') ? 'Pass' : 'Fail';
     const attendance = this.attendance(exam.session_id, studentId);
 
     return {
@@ -43,9 +44,9 @@ export class ResultService {
       subjects: details,
       total_marks: totalMarks,
       obtained_marks: obtainedMarks,
-      percentage: Number(percentage.toFixed(2)),
-      grade: this.grade(percentage, passing),
-      gpa: Number((details.length ? details.reduce((sum, subject) => sum + subject.gpa, 0) / details.length : 0).toFixed(2)),
+      percentage: percentage === null ? null : Number(percentage.toFixed(2)),
+      grade: percentage === null ? '—' : this.grade(percentage, passing),
+      gpa: percentage === null ? null : Number((details.reduce((sum, subject) => sum + Number(subject.gpa), 0) / details.length).toFixed(2)),
       status,
       is_complete: complete,
       attendance
@@ -56,10 +57,11 @@ export class ResultService {
     const db = getDatabase();
     const students = db.prepare(`SELECT e.student_id FROM enrollments e JOIN students s ON s.id=e.student_id WHERE e.class_id=? AND e.section_id IS ? AND e.status='active' AND s.status='active' ORDER BY CAST(e.roll_no AS INTEGER),s.first_name`).all(classId, sectionId) as { student_id: number }[];
     const data = students.map(({ student_id }) => this.result(examId, student_id, classId, sectionId));
-    data.sort((left, right) => right.percentage - left.percentage);
+    data.sort((left, right) => (right.percentage ?? -1) - (left.percentage ?? -1));
     let rank = 0;
     let last: number | undefined;
     return data.map((result, index) => {
+      if (result.percentage === null) return { ...result, position: null };
       if (last === undefined || result.percentage !== last) rank = index + 1;
       last = result.percentage;
       return { ...result, position: rank };
@@ -74,14 +76,14 @@ export class ResultService {
     const classTestPercent = classTestRawPercent * Number(exam.class_test_weight) / 100;
 
     const examMarks = subject.obtained_marks === null || subject.obtained_marks === undefined ? null : Number(subject.obtained_marks);
-    const examRawPercent = examMarks === null || Number(subject.total_marks) <= 0 ? 0 : examMarks * 100 / Number(subject.total_marks);
-    const examPercent = examRawPercent * Number(exam.exam_weight) / 100;
-    const totalPercent = classTestPercent + examPercent;
+    const examRawPercent = examMarks === null || Number(subject.total_marks) <= 0 ? null : examMarks * 100 / Number(subject.total_marks);
+    const examPercent = examRawPercent === null ? null : examRawPercent * Number(exam.exam_weight) / 100;
+    const totalPercent = examPercent === null ? null : classTestPercent + examPercent;
     const subjectPassPercent = Number(subject.passing_marks) * 100 / Number(subject.total_marks || 1);
 
-    // A missing exam mark, zero mark below pass threshold, or failed weighted
-    // total always yields Fail. This prevents empty/0% results being marked Pass.
-    const passed = examMarks !== null && examRawPercent >= subjectPassPercent && totalPercent >= passingPercentage;
+    // Missing and zero are intentionally different: missing stays incomplete,
+    // while an entered zero participates in the normal pass/fail calculation.
+    const passed = examMarks !== null && examRawPercent !== null && totalPercent !== null && examRawPercent >= subjectPassPercent && totalPercent >= passingPercentage;
     return {
       subject_id: subject.subject_id,
       subject_name: subject.subject_name,
@@ -89,11 +91,12 @@ export class ResultService {
       passing_marks: Number(subject.passing_marks),
       class_test_percent: Number(classTestPercent.toFixed(2)),
       exam_marks: examMarks,
-      exam_percent: Number(examPercent.toFixed(2)),
-      total_percent: Number(totalPercent.toFixed(2)),
-      grade: this.grade(totalPercent, passingPercentage),
-      gpa: this.gpa(totalPercent, passingPercentage),
-      status: passed ? 'Pass' : 'Fail',
+      exam_percent: examPercent === null ? null : Number(examPercent.toFixed(2)),
+      total_percent: totalPercent === null ? null : Number(totalPercent.toFixed(2)),
+      grade: totalPercent === null ? '—' : this.grade(totalPercent, passingPercentage),
+      gpa: totalPercent === null ? null : this.gpa(totalPercent, passingPercentage),
+      status: examMarks === null ? 'Incomplete' : passed ? 'Pass' : 'Fail',
+      is_complete: examMarks !== null,
       remarks: subject.remarks
     };
   }

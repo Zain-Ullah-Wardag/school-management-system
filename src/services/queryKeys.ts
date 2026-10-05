@@ -56,6 +56,7 @@ export const queryKeys = {
     examTypes: key('exam-types')
   },
   attendance: {
+    context: key('attendance-context'),
     rosterRoot: key('attendance-roster'),
     roster: (params: object) => key('attendance-roster', params),
     dailyRoot: key('daily-attendance'),

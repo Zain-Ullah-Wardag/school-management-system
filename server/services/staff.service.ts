@@ -69,6 +69,9 @@ export class StaffService {
     db.transaction(() => {
       const values = this.values({ ...input, _existing: existing });
       db.prepare(`UPDATE staff SET ${fields.map((field) => `${field}=?`).join(',')},updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(...fields.map((field) => values[field]), id);
+      if (existing.user_id && values.status !== 'active') {
+        db.prepare(`UPDATE users SET status='inactive',updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(existing.user_id);
+      }
       if (input.salary !== undefined && number(input.salary) !== number(existing.salary)) this.addSalary(id, number(input.salary), String(input.salary_effective_from || today()), String(input.salary_note || 'Salary revision'), actorId);
       if (input.login && typeof input.login === 'object' && !existing.user_id) {
         const userId = this.createLogin(input.login as Record<string, unknown>, String(values.first_name), actorId);
@@ -79,8 +82,13 @@ export class StaffService {
   }
 
   archive(id: number) {
-    const result = getDatabase().prepare(`UPDATE staff SET status='archived',updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(id);
-    if (!result.changes) throw new ApiError(404, 'Staff member not found');
+    const db = getDatabase();
+    const staff = db.prepare('SELECT user_id FROM staff WHERE id=?').get(id) as { user_id: number | null } | undefined;
+    if (!staff) throw new ApiError(404, 'Staff member not found');
+    db.transaction(() => {
+      db.prepare(`UPDATE staff SET status='archived',updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(id);
+      if (staff.user_id) db.prepare(`UPDATE users SET status='inactive',updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(staff.user_id);
+    })();
   }
 
   addSalary(id: number, amount: number, effectiveFrom: string, note: string, actorId: number) {

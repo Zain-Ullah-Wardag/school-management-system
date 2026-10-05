@@ -7,9 +7,8 @@ let mainWindow: BrowserWindow | null = null;
 let apiProcess: ChildProcess | null = null;
 let isQuitting = false;
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
-const desktopUrl = 'http://127.0.0.1:3299';
 
-async function createWindow() {
+async function createWindow(rendererUrl: string) {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -24,20 +23,22 @@ async function createWindow() {
       sandbox: false
     }
   });
-  const url = process.env.VITE_DEV_SERVER_URL;
-  await mainWindow.loadURL(url || desktopUrl);
+  await mainWindow.loadURL(rendererUrl);
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
 function startApi() {
-  if (isDev) return;
+  if (isDev) return Promise.resolve(process.env.VITE_DEV_SERVER_URL!);
   const appRoot = app.isPackaged ? path.join(process.resourcesPath, 'app.asar') : path.resolve(__dirname, '../..');
   const serverFile = path.join(appRoot, 'release/server/index.js');
   const dataDir = app.getPath('userData');
   apiProcess = fork(serverFile, [], {
     env: {
       ...process.env,
-      PORT: '3299',
+      // Let Windows allocate a free loopback port. A fixed port could already
+      // belong to an older installed build, which made the new window load
+      // that old build's renderer and stale UI state.
+      PORT: '0',
       DATABASE_PATH: path.join(dataDir, 'school.db'),
       UPLOAD_DIR: path.join(dataDir, 'uploads'),
       BACKUP_DIR: path.join(dataDir, 'backups'),
@@ -53,9 +54,26 @@ function startApi() {
   apiProcess.on('exit', (code, signal) => {
     if (!isQuitting) console.error(`[School ERP API] Stopped unexpectedly (code=${code}, signal=${signal})`);
   });
+
+  return new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('The local School ERP API did not report its port in time.')), 20_000);
+    const fail = (error: Error) => {
+      clearTimeout(timeout);
+      reject(error);
+    };
+
+    apiProcess?.once('error', fail);
+    apiProcess?.once('exit', (code, signal) => fail(new Error(`The local School ERP API stopped during startup (code=${code}, signal=${signal}).`)));
+    apiProcess?.on('message', (message: unknown) => {
+      const ready = message as { type?: string; port?: number };
+      if (ready?.type !== 'school-erp-api-ready' || !Number.isInteger(ready.port) || Number(ready.port) <= 0) return;
+      clearTimeout(timeout);
+      resolve(`http://127.0.0.1:${ready.port}`);
+    });
+  });
 }
 
-async function waitForApi(timeoutMs = 20_000) {
+async function waitForApi(desktopUrl: string, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -96,10 +114,11 @@ ipcMain.handle('desktop:open-print-preview', async (_event, html: string, title 
 ipcMain.handle('desktop:open-external', (_event, url: string) => shell.openExternal(url));
 
 app.whenReady().then(async () => {
-  startApi();
+  let rendererUrl = process.env.VITE_DEV_SERVER_URL || '';
   if (!isDev) {
     try {
-      await waitForApi();
+      rendererUrl = await startApi();
+      await waitForApi(rendererUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The local API could not start.';
       dialog.showErrorBox('School ERP could not start', `${message}\n\nClose the application and try again.`);
@@ -107,8 +126,8 @@ app.whenReady().then(async () => {
       return;
     }
   }
-  await createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) void createWindow(); });
+  await createWindow(rendererUrl);
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) void createWindow(rendererUrl); });
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

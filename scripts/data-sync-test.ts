@@ -26,6 +26,11 @@ async function run() {
   const studentDetail = await activate(client, queryKeys.students.detail(7), () => ({ version, record: 'student-detail' }));
   const classCounts = await activate(client, queryKeys.academic.classes(), () => ({ version, records: ['class-counts'] }));
   const dashboard = await activate(client, queryKeys.dashboard.overview(1), () => ({ version, cards: { total_students: version } }));
+  await client.fetchQuery({
+    queryKey: queryKeys.dashboard.overview(99),
+    queryFn: async () => ({ version, cards: { today_attendance: version } }),
+    staleTime: Infinity
+  });
 
   version = 1;
   await synchronizeData(client, ['students']);
@@ -44,6 +49,7 @@ async function run() {
   assert(attendanceHistory.observer.getCurrentResult().data?.version === 2, 'Student attendance history did not refetch after attendance mutation sync');
   assert(staffDetail.observer.getCurrentResult().data?.version === 2, 'Staff profile did not refetch after attendance mutation sync');
   assert(dashboard.observer.getCurrentResult().data?.version === 2, 'Dashboard did not refetch after attendance mutation sync');
+  assert(client.getQueryData<{ version: number }>(queryKeys.dashboard.overview(99))?.version === 2, 'Inactive dashboard cache did not refetch after attendance mutation sync');
 
   const incomeHistory = await activate(client, queryKeys.finance.entries('income', 1), () => ({ version, rows: ['income'] }));
   const financeSummary = await activate(client, queryKeys.finance.summary, () => ({ version, net_income: version }));
@@ -88,7 +94,7 @@ async function run() {
   [studentList, studentDetail, classCounts, dashboard, attendanceRoster, attendanceHistory, staffDetail, incomeHistory, financeSummary, testMarks, resultHistory, staffList, academicAssignments, invoiceList, timetable, branding, users, messages, visitors]
     .forEach(({ unsubscribe }) => unsubscribe());
   client.clear();
-  console.log('Data synchronization test passed: every major list/detail/profile/summary query scope refreshes centrally without route navigation or page reload.');
+  console.log('Data synchronization test passed: every active and inactive list/detail/profile/summary query scope refreshes centrally without route navigation or page reload.');
 }
 
 run().catch((error) => {

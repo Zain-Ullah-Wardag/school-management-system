@@ -135,6 +135,7 @@ const roots: Record<Exclude<SyncScope, 'system'>, QueryKey[]> = {
   settings: [
     queryKeys.settings.all,
     queryKeys.settings.branding,
+    queryKeys.attendance.context,
     queryKeys.assessments.resultsRoot,
     queryKeys.students.resultsRoot,
     queryKeys.dashboard.root
@@ -177,15 +178,15 @@ export function rootsForScopes(scopes: readonly SyncScope[], extra: readonly Que
 }
 
 /**
- * Marks related queries stale and refetches all currently mounted observers.
- * Inactive queries remain stale and fetch as soon as their route is mounted;
- * no timers, polling, navigation, or full-page reload is used.
+ * Marks related queries stale and refetches every cached affected query,
+ * including routes that are not currently mounted. This keeps destination
+ * pages correct on their first visit after a mutation.
  */
 export async function synchronizeData(queryClient: QueryClient, scopes: readonly SyncScope[] = [], extra: readonly QueryKey[] = []) {
   const queryRoots = rootsForScopes(scopes, extra);
   if (queryRoots === null) {
-    await queryClient.invalidateQueries({ refetchType: 'active' });
+    await queryClient.invalidateQueries({ refetchType: 'all' });
     return;
   }
-  await Promise.all(queryRoots.map((queryKey) => queryClient.invalidateQueries({ queryKey, refetchType: 'active' })));
+  await Promise.all(queryRoots.map((queryKey) => queryClient.invalidateQueries({ queryKey, refetchType: 'all' })));
 }

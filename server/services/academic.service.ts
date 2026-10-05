@@ -3,6 +3,20 @@ import { ApiError } from '../utils/errors';
 import { required } from '../utils/http';
 import { nullable, number, bool } from '../utils/serializers';
 
+function finiteNumber(value: unknown, label: string) {
+  if (value === null || value === undefined || value === '' || (typeof value === 'string' && !value.trim())) throw new ApiError(422, `${label} is required`);
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new ApiError(422, `${label} must be a valid number`);
+  return parsed;
+}
+
+function isoDate(value: unknown, label: string) {
+  const date = required(value, label);
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new ApiError(422, `${label} must be a valid date`);
+  return date;
+}
+
 export class AcademicService {
   classes(includeInactive = false) {
     const db = getDatabase();
@@ -48,7 +62,11 @@ export class AcademicService {
 
   subjects(includeInactive = false) { return getDatabase().prepare(`SELECT s.*,(SELECT COUNT(*) FROM class_subjects cs WHERE cs.subject_id=s.id) class_count FROM subjects s ${includeInactive ? '' : "WHERE s.status='active'"} ORDER BY s.name`).all(); }
   saveSubject(input: Record<string, unknown>, id?: number) {
-    const db = getDatabase(); const values = [required(input.code, 'Subject code'), required(input.name, 'Subject name'), nullable(input.name_ur), number(input.max_marks, 100), number(input.pass_marks, 40), input.status === 'inactive' ? 'inactive' : 'active'];
+    const db = getDatabase(); const maximumMarks = finiteNumber(input.max_marks, 'Maximum marks'); const passingMarks = finiteNumber(input.pass_marks, 'Passing marks');
+    if (maximumMarks <= 0) throw new ApiError(422, 'Maximum marks must be greater than zero');
+    if (passingMarks < 0) throw new ApiError(422, 'Passing marks cannot be negative');
+    if (passingMarks > maximumMarks) throw new ApiError(422, `Passing marks cannot exceed maximum marks (${maximumMarks})`);
+    const values = [required(input.code, 'Subject code'), required(input.name, 'Subject name'), nullable(input.name_ur), maximumMarks, passingMarks, input.status === 'inactive' ? 'inactive' : 'active'];
     if (id) { if (!db.prepare('UPDATE subjects SET code=?,name=?,name_ur=?,max_marks=?,pass_marks=?,status=? WHERE id=?').run(...values, id).changes) throw new ApiError(404, 'Subject not found'); return db.prepare('SELECT * FROM subjects WHERE id=?').get(id); }
     const result = db.prepare('INSERT INTO subjects (code,name,name_ur,max_marks,pass_marks,status) VALUES (?,?,?,?,?,?)').run(...values); return db.prepare('SELECT * FROM subjects WHERE id=?').get(result.lastInsertRowid);
   }
@@ -67,7 +85,8 @@ export class AcademicService {
 
   sessions() { return getDatabase().prepare('SELECT * FROM school_sessions ORDER BY starts_on DESC').all(); }
   saveSession(input: Record<string, unknown>, id?: number) {
-    const db = getDatabase(); const name = required(input.name, 'Session name'); const starts = required(input.starts_on, 'Start date'); const ends = required(input.ends_on, 'End date'); const current = bool(input.is_current);
+    const db = getDatabase(); const name = required(input.name, 'Session name'); const starts = isoDate(input.starts_on, 'Start date'); const ends = isoDate(input.ends_on, 'End date'); const current = bool(input.is_current);
+    if (ends < starts) throw new ApiError(422, 'Academic session end date must be on or after the start date');
     let itemId = id;
     db.transaction(() => {
       if (current) db.prepare('UPDATE school_sessions SET is_current=0').run();

@@ -74,15 +74,9 @@ export class StudentService {
       const values = this.values({ ...input, _existing: existing });
       const assignments = studentColumns.map((field) => `${field}=?`).join(',');
       db.prepare(`UPDATE students SET ${assignments},updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(...studentColumns.map((field) => values[field]), id);
-      if (input.class_id) {
-        const enrollment = db.prepare(`SELECT id FROM enrollments WHERE student_id=? AND status='active'`).get(id) as { id: number } | undefined;
-        if (enrollment) {
-          const nextClassId = Number(input.class_id);
-          const nextSectionId = nullable(input.section_id);
-          const nextRoll = typeof input.roll_no === 'string' && input.roll_no.trim() ? input.roll_no.trim() : this.nextRollNumber(Number(input.session_id) || this.currentSessionId(), nextClassId, nextSectionId, id);
-          db.prepare('UPDATE enrollments SET class_id=?,section_id=?,roll_no=? WHERE id=?').run(nextClassId, nextSectionId, nextRoll, enrollment.id);
-        }
-      }
+      // Profile edits never rewrite active enrollment or its history. Class,
+      // section, session, and roll changes belong to the explicit promotion
+      // workflow, even if an older client still submits those fields here.
       if (Array.isArray(input.contacts)) this.saveContacts(id, input.contacts);
     })();
     return this.get(id);

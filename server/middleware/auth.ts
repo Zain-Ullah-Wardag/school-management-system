@@ -25,7 +25,13 @@ export function requireAuth(req: AuthenticatedRequest, _res: Response, next: Nex
   try {
     const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
     if (!token) throw new ApiError(401, 'Authentication is required');
-    req.user = jwt.verify(token, secret(), { issuer: 'school-erp' }) as AuthUser;
+    const claims = jwt.verify(token, secret(), { issuer: 'school-erp' }) as AuthUser;
+
+    // A signed token proves who originally logged in, but it must not keep an
+    // archived/deactivated account alive for the rest of its 12-hour lifetime.
+    // Resolve the user and permissions from the database on every request so
+    // status and role changes take effect immediately.
+    req.user = currentUser(claims.id);
     next();
   } catch (error) {
     next(error instanceof ApiError ? error : new ApiError(401, 'Your session is invalid or expired'));
@@ -61,7 +67,7 @@ export function currentUser(userId: number): AuthUser {
   const denied = db.prepare(`SELECT p.code FROM permissions p JOIN user_permissions up ON up.permission_id=p.id WHERE up.user_id=? AND up.granted=0`).all(userId) as { code: string }[];
   const resolved = permissions.map((item) => item.code).filter((code) => !denied.some((item) => item.code === code));
   const teacherRoles = ['class_teacher', 'subject_teacher'];
-  const restrictedForTeachers = ['dashboard.', 'fees.', 'finance.', 'reports.', 'academic.', 'settings.', 'users.', 'staff.', 'visitors.'];
+  const restrictedForTeachers = ['dashboard.', 'fees.', 'finance.', 'reports.', 'settings.', 'users.', 'staff.', 'visitors.'];
   const safePermissions = teacherRoles.includes(row.role) ? resolved.filter((code) => !restrictedForTeachers.some((prefix) => code.startsWith(prefix))) : resolved;
   return { id: row.id, username: row.username, fullName: row.full_name, role: row.role, permissions: safePermissions };
 }

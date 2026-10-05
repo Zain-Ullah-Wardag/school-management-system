@@ -83,9 +83,19 @@ export function seedDatabase(db: Database.Database) {
       if (permission) mapPermission.run(roleIdentifier, permission.id);
     });
   };
-  synchronizeRole('class_teacher', ['students.read', 'timetable.read', 'attendance.read', 'attendance.mark', 'assessments.read', 'assessments.manage', 'sms.send']);
-  synchronizeRole('subject_teacher', ['students.read', 'timetable.read', 'attendance.read', 'attendance.mark', 'assessments.read', 'assessments.manage', 'sms.send']);
+  // Teacher pages use the read-only academic lookup endpoints for their class,
+  // section, subject and session selectors. They still do not receive
+  // academic.manage, so academic records cannot be changed.
+  synchronizeRole('class_teacher', ['students.read', 'academic.read', 'timetable.read', 'attendance.read', 'attendance.mark', 'assessments.read', 'assessments.manage', 'sms.send']);
+  synchronizeRole('subject_teacher', ['students.read', 'academic.read', 'timetable.read', 'attendance.read', 'attendance.mark', 'assessments.read', 'assessments.manage', 'sms.send']);
   synchronizeRole('staff', ['dashboard.read']);
+
+  // Repair existing installations affected before staff archiving also
+  // disabled the linked login. Never allow an inactive/archived staff profile
+  // to retain an active user account after startup.
+  db.prepare(`UPDATE users SET status='inactive',updated_at=CURRENT_TIMESTAMP WHERE id IN (
+    SELECT user_id FROM staff WHERE user_id IS NOT NULL AND status<>'active'
+  ) AND status='active'`).run();
 
   const settingInsert = db.prepare('INSERT OR IGNORE INTO settings (key,value,group_name) VALUES (?,?,?)');
   settingRows.forEach((row) => settingInsert.run(...row));

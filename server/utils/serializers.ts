@@ -8,7 +8,7 @@ export const bool = (value: unknown) => value === true || value === 1 || value =
 
 const fallbackTimeZone = 'Asia/Karachi';
 
-function activeTimeZone() {
+export function schoolTimeZone() {
   const candidate = process.env.SCHOOL_TIMEZONE || fallbackTimeZone;
   try {
     // Validate once by constructing the formatter. Settings currently expose
@@ -20,17 +20,20 @@ function activeTimeZone() {
   }
 }
 
-/** Returns the school-local calendar date, not the server's UTC date. */
-export const today = () => {
+/** Formats an instant as a calendar date in an explicit IANA time zone. */
+export const dateInTimeZone = (value: Date, timeZone: string) => {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: activeTimeZone(),
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
-  }).formatToParts(new Date());
+  }).formatToParts(value);
   const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 };
+
+/** Returns the school-local calendar date, not the server's UTC date. */
+export const today = (value = new Date()) => dateInTimeZone(value, schoolTimeZone());
 
 // Timestamps remain UTC ISO instants; only business-date comparisons use today().
 export const now = () => new Date().toISOString();

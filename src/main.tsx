@@ -8,17 +8,32 @@ import { ToastProvider } from './context/ToastContext';
 import { GlobalSearchProvider } from './context/GlobalSearchContext';
 import './styles/index.css';
 
-// SQLite-backed screens are inexpensive to refetch. Prefer correct current
-// operational data over a time-based stale window when a route remounts.
+// The desktop API is local and remains available without internet access.
+// React Query's default "online" network mode would pause localhost requests
+// whenever Windows/Chromium reports that the computer is offline, leaving
+// screens stuck with missing or zero-value data until they are remounted.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      networkMode: 'always',
+      retry: 2,
+      retryDelay: (attempt) => Math.min(300 * 2 ** attempt, 1500),
       staleTime: 0,
       refetchOnMount: 'always',
-      refetchOnWindowFocus: false
+      // The API runs inside this desktop application. Browser online/focus
+      // events are unrelated to API availability and can otherwise cause
+      // repeated background fetches that leave loading labels on screen.
+      refetchOnReconnect: false,
+      refetchOnWindowFocus: false,
+      // Always publish data and status changes to mounted screens. This is a
+      // small desktop app, so correctness is more useful than tracked-property
+      // render optimisation.
+      notifyOnChangeProps: 'all'
     },
-    mutations: { retry: 0 }
+    mutations: {
+      networkMode: 'always',
+      retry: 0
+    }
   }
 });
 

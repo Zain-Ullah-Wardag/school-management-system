@@ -60,12 +60,12 @@ export function StudentForm({ student, onSubmit, onCancel, onComplete, saving }:
   }, [sections, selectedClass]);
 
   useEffect(() => {
-    if (selectedSection && !classSections.some((section: any) => String(section.id) === String(selectedSection))) setValue('section_id', '');
-  }, [classSections, selectedSection, setValue]);
+    if (!editing && selectedSection && !classSections.some((section: any) => String(section.id) === String(selectedSection))) setValue('section_id', '');
+  }, [classSections, editing, selectedSection, setValue]);
 
   const submit = async (values: FormData) => {
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...values,
         // Registration and roll numbers are generated server-side for new records.
         ...(editing ? { admission_no: student.admission_no, roll_no: student.roll_no } : { admission_no: undefined, roll_no: undefined }),
@@ -73,6 +73,12 @@ export function StudentForm({ student, onSubmit, onCancel, onComplete, saving }:
         session_id: values.session_id || null,
         contacts: values.contacts.filter((contact) => contact.full_name)
       };
+      if (editing) {
+        // Enrollment placement is changed only by the promotion workflow. Keeping
+        // it out of profile PATCH requests prevents an asynchronously loaded
+        // section selector from erasing a student's active enrollment.
+        for (const field of ['session_id', 'class_id', 'section_id', 'roll_no']) delete payload[field];
+      }
       const saved = await onSubmit(payload);
       onComplete?.(saved);
     } catch (error) {
@@ -87,9 +93,9 @@ export function StudentForm({ student, onSubmit, onCancel, onComplete, saving }:
         <div className="md:row-span-2"><Field label="Student photo"><PhotoUploader value={watch('photo_path')} onChange={(path) => setValue('photo_path', path)} name={watch('first_name')} /></Field></div>
         <Field label="Registration number"><TextInput value={editing ? student.admission_no : identifiers?.admission_no || 'Generated on save'} readOnly className="bg-slate-50 font-semibold text-brand-700" /></Field>
         <Field label="Roll number"><TextInput value={editing ? student.roll_no || '—' : identifiers?.roll_no || 'Select class first'} readOnly className="bg-slate-50 font-semibold text-brand-700" /></Field>
-        <Field label="Academic session"><SelectInput {...register('session_id')}><option value="">Current session</option>{sessions.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput></Field>
-        <Field label="Class" required error={errors.class_id?.message}><SelectInput {...register('class_id', { required: 'Class is required' })}><option value="">Select class</option>{classes.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput></Field>
-        <Field label="Section"><SelectInput disabled={!selectedClass} {...register('section_id')}><option value="">{selectedClass ? 'No section' : 'Select a class first'}</option>{classSections.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput></Field>
+        <Field label="Academic session">{editing ? <TextInput value={student.session_name || 'Current session'} readOnly className="bg-slate-50" /> : <SelectInput {...register('session_id')}><option value="">Current session</option>{sessions.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput>}</Field>
+        <Field label="Class" required error={errors.class_id?.message}>{editing ? <TextInput value={student.class_name || 'Not assigned'} readOnly className="bg-slate-50" /> : <SelectInput {...register('class_id', { required: 'Class is required' })}><option value="">Select class</option>{classes.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput>}</Field>
+        <Field label="Section">{editing ? <TextInput value={student.section_name || 'No section'} readOnly className="bg-slate-50" /> : <SelectInput disabled={!selectedClass} {...register('section_id')}><option value="">{selectedClass ? 'No section' : 'Select a class first'}</option>{classSections.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectInput>}</Field>
         <Field label="Admission date" required><TextInput type="date" {...register('admission_date', { required: true })} /></Field>
       </div>
     </section>

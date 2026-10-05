@@ -3,6 +3,12 @@ import { ApiError } from '../utils/errors';
 import { required } from '../utils/http';
 import { nullable, number } from '../utils/serializers';
 
+function requiredTime(value: unknown, label: string) {
+  const time = required(value, label);
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new ApiError(422, `${label} must be a valid time`);
+  return time;
+}
+
 export class TimetableService {
   settings() {
     const db = getDatabase();
@@ -19,7 +25,9 @@ export class TimetableService {
     })(); return this.settings();
   }
   savePeriod(input: Record<string, unknown>, id?: number) {
-    const db = getDatabase(); const values = [required(input.name, 'Period name'), number(input.sequence), required(input.start_time, 'Start time'), required(input.end_time, 'End time'), ['lesson','break','assembly','other'].includes(String(input.period_type)) ? input.period_type : 'lesson'];
+    const db = getDatabase(); const startTime = requiredTime(input.start_time, 'Start time'); const endTime = requiredTime(input.end_time, 'End time');
+    if (endTime <= startTime) throw new ApiError(422, 'Period end time must be after the start time');
+    const values = [required(input.name, 'Period name'), number(input.sequence), startTime, endTime, ['lesson','break','assembly','other'].includes(String(input.period_type)) ? input.period_type : 'lesson'];
     if (id) { if (!db.prepare('UPDATE timetable_periods SET name=?,sequence=?,start_time=?,end_time=?,period_type=? WHERE id=?').run(...values,id).changes) throw new ApiError(404,'Period not found'); return db.prepare('SELECT * FROM timetable_periods WHERE id=?').get(id); }
     const r=db.prepare('INSERT INTO timetable_periods (name,sequence,start_time,end_time,period_type) VALUES (?,?,?,?,?)').run(...values); return db.prepare('SELECT * FROM timetable_periods WHERE id=?').get(r.lastInsertRowid);
   }

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { schoolApi } from '../services/schoolApi';
+import { queryKeys } from '../services/queryKeys';
 import type { User } from '../types';
 
 type AuthContextValue = {
@@ -27,6 +28,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  const warmInitialWorkspace = useCallback(async (nextUser: User) => {
+    if (!['administrator', 'principal'].includes(nextUser.role)) return;
+
+    // Keep the protected route on its loading screen until leadership totals
+    // are available. A dashboard request failure must not invalidate an
+    // otherwise valid login; DashboardPage will show its retry state instead.
+    try {
+      await queryClient.prefetchQuery({
+        queryKey: queryKeys.dashboard.overview(nextUser.id),
+        queryFn: schoolApi.dashboard
+      });
+    } catch {
+      // The mounted dashboard query owns its error and retry UI.
+    }
+  }, [queryClient]);
+
   const refresh = useCallback(async () => {
     if (!localStorage.getItem(tokenKey)) {
       setUser(null);
@@ -35,7 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setUser(await schoolApi.auth.me());
+      const nextUser = await schoolApi.auth.me();
+      setUser(nextUser);
+      await warmInitialWorkspace(nextUser);
     } catch {
       localStorage.removeItem(tokenKey);
       clearProtectedData();
@@ -43,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [clearProtectedData]);
+  }, [clearProtectedData, warmInitialWorkspace]);
 
   useEffect(() => {
     void refresh();
@@ -56,9 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // this synchronously in its request interceptor.
     localStorage.setItem(tokenKey, result.token);
     clearProtectedData();
+    await warmInitialWorkspace(result.user);
     setUser(result.user);
     setLoading(false);
-  }, [clearProtectedData]);
+  }, [clearProtectedData, warmInitialWorkspace]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(tokenKey);

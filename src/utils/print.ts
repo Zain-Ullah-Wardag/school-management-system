@@ -3,7 +3,9 @@ export type PrintOrientation = 'portrait' | 'landscape';
 export const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char] || char));
 
 export function buildPrintDocument(content: string, title = 'School ERP Report', orientation: PrintOrientation = 'portrait') {
-  const base = window.desktop?.isElectron ? 'http://127.0.0.1:3299/' : `${window.location.origin}/`;
+  // The packaged desktop API uses a Windows-assigned loopback port. Use the
+  // current renderer origin so logos/uploads also resolve in print previews.
+  const base = `${window.location.origin}/`;
   const pageSize = orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait';
   const safeTitle = escapeHtml(title);
   return `<!doctype html>
